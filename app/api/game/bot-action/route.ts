@@ -144,7 +144,25 @@ Write the bot's action:
         outcome += ` Lost a life! ${currentPlayer.lives} remaining.`;
       }
 
-      gameState.phase = "waiting-continue";
+      // Check if all players are eliminated
+      const alivePlayers = gameState.players.filter((p: any) => p.isAlive);
+
+      if (alivePlayers.length === 0) {
+        // All players eliminated - game over, highest score wins
+        gameState.phase = "game-over";
+        const winner = [...gameState.players].sort(
+          (a: any, b: any) => b.score - a.score
+        )[0];
+        gameState.winner = winner.id;
+        outcome += " All players have been eliminated!";
+      } else if (alivePlayers.length === 1) {
+        // One player left - they win
+        gameState.phase = "game-over";
+        gameState.winner = alivePlayers[0].id;
+        outcome += ` ${alivePlayers[0].name} is the last one standing!`;
+      } else {
+        gameState.phase = "waiting-continue";
+      }
     }
 
     await setGame(gameId, gameState);

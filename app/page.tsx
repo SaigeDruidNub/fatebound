@@ -31,6 +31,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [lastOutcome, setLastOutcome] = useState("");
   const [botThinking, setBotThinking] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
   const botActionInProgress = useRef(false);
 
   // Sync gameId from gameState if needed
@@ -574,6 +575,15 @@ export default function Home() {
             />
           </div>
 
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={() => setShowHowToPlay(true)}
+              className="text-[#B06821] hover:text-white transition-colors underline text-sm sm:text-base"
+            >
+              📖 How to Play
+            </button>
+          </div>
+
           {!gameState ? (
             <div className="space-y-6 bg-[#1B2A30]/60 p-8 rounded-lg backdrop-blur">
               <div>
@@ -689,6 +699,178 @@ export default function Home() {
             </div>
           )}
         </main>
+
+        {/* How to Play Modal */}
+        {showHowToPlay && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowHowToPlay(false)}
+          >
+            <div
+              className="bg-[#1B2A30] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#B06821]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-[#B06821]">
+                    📖 How to Play
+                  </h2>
+                  <button
+                    onClick={() => setShowHowToPlay(false)}
+                    className="text-white hover:text-[#B06821] text-2xl transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-6 text-white">
+                  <section>
+                    <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                      🎯 Objective
+                    </h3>
+                    <p className="text-sm sm:text-base leading-relaxed">
+                      Be the last player standing by solving the word puzzle!
+                      Navigate dangerous scenarios, reveal letters, and outsmart
+                      your opponents to win.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                      🎮 Game Setup
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                      <li>Create a new game or join with a game code</li>
+                      <li>
+                        Add computer players (bots) or wait for friends to join
+                      </li>
+                      <li>
+                        Each player starts with <strong>3 lives ❤️</strong>
+                      </li>
+                      <li>
+                        The host starts the game when ready (minimum 2 players)
+                      </li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                      ⚔️ Your Turn - Action Phase
+                    </h3>
+                    <p className="text-sm sm:text-base leading-relaxed mb-2">
+                      Each round, you'll face a dangerous scenario. Describe
+                      what your character does:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                      <li>
+                        <strong>Smart, cautious actions</strong> = More likely
+                        to succeed
+                      </li>
+                      <li>
+                        <strong>Creative solutions</strong> = Rewarded
+                      </li>
+                      <li>
+                        <strong>Reckless actions</strong> = Higher risk of
+                        failure
+                      </li>
+                      <li>
+                        <strong>Success:</strong> Move to letter selection (+10
+                        points)
+                      </li>
+                      <li>
+                        <strong>Failure:</strong> Lose 1 life ❤️
+                      </li>
+                      <li>
+                        <strong>0 lives:</strong> You're eliminated! 💀
+                      </li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                      🔤 Letter Selection Phase
+                    </h3>
+                    <p className="text-sm sm:text-base leading-relaxed mb-2">
+                      After surviving a challenge, choose one of these options:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                      <li>
+                        <strong>Pick a Letter:</strong> Earn points if it's in
+                        the puzzle (+5 per letter)
+                      </li>
+                      <li>
+                        <strong>Solve the Puzzle:</strong> Win the game
+                        instantly! (+100 points)
+                      </li>
+                      <li>
+                        <strong>Wrong puzzle guess:</strong> You're eliminated
+                        immediately! ☠️
+                      </li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                      🏆 Winning the Game
+                    </h3>
+                    <p className="text-sm sm:text-base leading-relaxed">
+                      There are three ways to win:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 text-sm sm:text-base mt-2">
+                      <li>
+                        <strong>Solve the puzzle correctly</strong> - Instant
+                        win!
+                      </li>
+                      <li>
+                        <strong>Reveal all letters</strong> - Automatic win!
+                      </li>
+                      <li>
+                        <strong>Be the last player alive</strong> - Everyone
+                        else eliminated
+                      </li>
+                    </ul>
+                    <p className="text-sm sm:text-base leading-relaxed mt-2">
+                      If all players are eliminated, the highest score wins!
+                    </p>
+                  </section>
+
+                  <section>
+                    <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                      💡 Pro Tips
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                      <li>Start with common letters: E, T, A, O, I, N</li>
+                      <li>Balance risk vs. reward in challenges</li>
+                      <li>
+                        Don't guess the puzzle too early - wrong guesses
+                        eliminate you!
+                      </li>
+                      <li>Pay attention to the puzzle category for clues</li>
+                      <li>
+                        Every correct letter guess gets you closer to solving
+                      </li>
+                    </ul>
+                  </section>
+
+                  <div className="pt-4 border-t border-[#305853]">
+                    <p className="text-center text-[#305853] text-sm">
+                      May fate be on your side! ⚔️✨
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={() => setShowHowToPlay(false)}
+                    className="rounded-lg bg-[#9E2C21] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#511B18]"
+                  >
+                    Got It!
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -971,6 +1153,176 @@ export default function Home() {
           )}
         </div>
       </main>
+
+      {/* How to Play Modal */}
+      {showHowToPlay && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowHowToPlay(false)}
+        >
+          <div
+            className="bg-[#1B2A30] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#B06821]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 sm:p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl sm:text-3xl font-bold text-[#B06821]">
+                  📖 How to Play
+                </h2>
+                <button
+                  onClick={() => setShowHowToPlay(false)}
+                  className="text-white hover:text-[#B06821] text-2xl transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6 text-white">
+                <section>
+                  <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                    🎯 Objective
+                  </h3>
+                  <p className="text-sm sm:text-base leading-relaxed">
+                    Be the last player standing by solving the word puzzle!
+                    Navigate dangerous scenarios, reveal letters, and outsmart
+                    your opponents to win.
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                    🎮 Game Setup
+                  </h3>
+                  <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                    <li>Create a new game or join with a game code</li>
+                    <li>
+                      Add computer players (bots) or wait for friends to join
+                    </li>
+                    <li>
+                      Each player starts with <strong>3 lives ❤️</strong>
+                    </li>
+                    <li>
+                      The host starts the game when ready (minimum 2 players)
+                    </li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                    ⚔️ Your Turn - Action Phase
+                  </h3>
+                  <p className="text-sm sm:text-base leading-relaxed mb-2">
+                    Each round, you'll face a dangerous scenario. Describe what
+                    your character does:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                    <li>
+                      <strong>Smart, cautious actions</strong> = More likely to
+                      succeed
+                    </li>
+                    <li>
+                      <strong>Creative solutions</strong> = Rewarded
+                    </li>
+                    <li>
+                      <strong>Reckless actions</strong> = Higher risk of failure
+                    </li>
+                    <li>
+                      <strong>Success:</strong> Move to letter selection (+10
+                      points)
+                    </li>
+                    <li>
+                      <strong>Failure:</strong> Lose 1 life ❤️
+                    </li>
+                    <li>
+                      <strong>0 lives:</strong> You're eliminated! 💀
+                    </li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                    🔤 Letter Selection Phase
+                  </h3>
+                  <p className="text-sm sm:text-base leading-relaxed mb-2">
+                    After surviving a challenge, choose one of these options:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                    <li>
+                      <strong>Pick a Letter:</strong> Earn points if it's in the
+                      puzzle (+5 per letter)
+                    </li>
+                    <li>
+                      <strong>Solve the Puzzle:</strong> Win the game instantly!
+                      (+100 points)
+                    </li>
+                    <li>
+                      <strong>Wrong guess:</strong> You're eliminated
+                      immediately! ☠️
+                    </li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                    🏆 Winning the Game
+                  </h3>
+                  <p className="text-sm sm:text-base leading-relaxed">
+                    There are three ways to win:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-sm sm:text-base mt-2">
+                    <li>
+                      <strong>Solve the puzzle correctly</strong> - Instant win!
+                    </li>
+                    <li>
+                      <strong>Reveal all letters</strong> - Automatic win!
+                    </li>
+                    <li>
+                      <strong>Be the last player alive</strong> - Everyone else
+                      eliminated
+                    </li>
+                  </ul>
+                  <p className="text-sm sm:text-base leading-relaxed mt-2">
+                    If all players are eliminated, the highest score wins!
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="text-xl font-bold text-[#B06821] mb-2">
+                    💡 Pro Tips
+                  </h3>
+                  <ul className="list-disc list-inside space-y-2 text-sm sm:text-base">
+                    <li>Start with common letters: E, T, A, O, I, N</li>
+                    <li>Balance risk vs. reward in challenges</li>
+                    <li>
+                      Don't guess the puzzle too early - wrong guesses eliminate
+                      you!
+                    </li>
+                    <li>Pay attention to the puzzle category for clues</li>
+                    <li>
+                      Every correct letter guess gets you closer to solving
+                    </li>
+                  </ul>
+                </section>
+
+                <div className="pt-4 border-t border-[#305853]">
+                  <p className="text-center text-[#305853] text-sm">
+                    May fate be on your side! ⚔️✨
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => setShowHowToPlay(false)}
+                  className="rounded-lg bg-[#9E2C21] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#511B18]"
+                >
+                  Got It!
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -155,6 +155,32 @@ export async function POST(request: NextRequest) {
       message = `Great! There ${
         count === 1 ? "is" : "are"
       } ${count} ${upperLetter}'${count === 1 ? "" : "s"} in the puzzle!`;
+
+      // Check if all letters in the puzzle have been revealed
+      const puzzleLetters = new Set(
+        gameState.puzzle.phrase
+          .toUpperCase()
+          .split("")
+          .filter((char: string) => /[A-Z]/.test(char))
+      );
+
+      const allLettersRevealed = Array.from(puzzleLetters).every((letter) =>
+        gameState.puzzle.revealedLetters.has(letter)
+      );
+
+      if (allLettersRevealed) {
+        // All letters revealed - player wins!
+        currentPlayer.score += 100;
+        gameState.phase = "game-over";
+        gameState.winner = currentPlayer.id;
+        message += ` 🎉 All letters revealed! ${currentPlayer.name} wins!`;
+
+        await setGame(gameId, gameState);
+        return NextResponse.json({
+          gameState: serializeGameState(gameState),
+          message,
+        });
+      }
     } else {
       message = `Sorry, there are no ${upperLetter}'s in the puzzle.`;
     }
