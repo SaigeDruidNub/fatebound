@@ -1,0 +1,114 @@
+{
+  "SM19B3": {
+    "id": "SM19B3",
+    "players": [
+      {
+        "id": "33bn1xfipab",
+        "name": "Saige",
+        "isAlive": true,
+        "lives": 3,
+        "score": 0,
+        "isBot": false
+      }
+    ],
+    "currentPlayerIndex": 0,
+    "phase": "lobby",
+    "puzzle": {
+      "phrase": "SEEK THE ANCIENT POWER",
+      "category": "Epic Quest",
+      "revealedLetters": {}
+    },
+    "currentScenario": "The rickety bridge you're crossing snaps, sending you plummeting towards the chasm below as you desperately grab for a dangling chain. The wind howls, and you see grotesque, winged figures circling in the distance. What do you do?",
+    "roundNumber": 1,
+    "winner": null,
+    "createdAt": 1766878826757
+  },
+  "NVKQCK": {
+    "id": "NVKQCK",
+    "players": [
+      {
+        "id": "m23udzhzrpc",
+        "name": "Saige",
+        "isAlive": true,
+        "lives": 3,
+        "score": 0,
+        "isBot": false
+      }
+    ],
+    "currentPlayerIndex": 0,
+    "phase": "lobby",
+    "puzzle": {
+      "phrase": "SEEK THE LOST ARTIFACT",
+      "category": "Heroic Journey",
+      "revealedLetters": {}
+    },
+    "currentScenario": "The ground gives way, and you plummet into a dark, churning river filled with jagged rocks and the current threatens to drag you under. A rickety bridge is just ahead. What do you do?",
+    "roundNumber": 1,
+    "winner": null,
+    "createdAt": 1766878911548
+  },
+  "GX0ZNQ": {
+    "id": "GX0ZNQ",
+    "players": [
+      {
+        "id": "qn9wziibc1c",
+        "name": "Saige",
+        "isAlive": true,
+        "lives": 3,
+        "score": 10,
+        "isBot": false
+      },
+      {
+        "id": "f3n6xo8rgvr",
+        "name": "The Thinker",
+        "isAlive": true,
+        "lives": 3,
+        "score": 0,
+        "isBot": true
+      }
+    ],
+    "currentPlayerIndex": 0,
+    "phase": "letter-selection",
+    "puzzle": {
+      "phrase": "SEEK THE LOST ARTIFACT",
+      "category": "Epic Quest",
+      "revealedLetters": {}
+    },
+    "currentScenario": "The rickety bridge you're crossing snaps, sending you plummeting towards a chasm filled with monstrous spiders. You manage to grab onto a fraying rope dangling from the remaining bridge section, but the spiders are already climbing the supports toward you. What do you do?",
+    "roundNumber": 1,
+    "winner": null,
+    "createdAt": 1766878986055
+  },
+  "CXJXD8": {
+    "id": "CXJXD8",
+    "players": [
+      {
+        "id": "fo89e2p7d9h",
+        "name": "Saige",
+        "isAlive": true,
+        "lives": 1,
+        "score": 400,
+        "isBot": false
+      },
+      {
+        "id": "6uyh5s3n1v",
+        "name": "Wise Sage",
+        "isAlive": true,
+        "lives": 1,
+        "score": 65,
+        "isBot": true
+      }
+    ],
+    "currentPlayerIndex": 0,
+    "phase": "game-over",
+    "puzzle": {
+      "phrase": "SEEK THE LOST ARTIFACT",
+      "category": "Epic Quest",
+      "revealedLetters": {}
+    },
+    "currentScenario": "The amulet keeping the raging blizzard at bay shatters, and a child's voice begs you to let them in from the cold, even though doing so will almost certainly break the protective circle around your camp. What do you do?",
+    "roundNumber": 13,
+    "winner": "fo89e2p7d9h",
+    "createdAt": 1766879265515
+  }
+}
