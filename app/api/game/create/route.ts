@@ -11,27 +11,260 @@ function generatePlayerId(): string {
 }
 
 async function generatePuzzle(difficulty: PuzzleDifficulty = "medium") {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  console.log(
+    `🧩 Generating puzzle. Difficulty: ${difficulty}, API key present: ${!!apiKey}`
+  );
+
+  if (!apiKey) {
+    console.log(
+      "⚠️ No GEMINI_API_KEY found in create route, using fallback puzzles"
+    );
+    // Fallback puzzles organized by difficulty
+    const fallbackPuzzles: Record<
+      PuzzleDifficulty,
+      Array<{ phrase: string; category: string; difficulty: PuzzleDifficulty }>
+    > = {
+      easy: [
+        {
+          phrase: "MAGIC SWORD",
+          category: "Legendary Weapon",
+          difficulty: "easy",
+        },
+        {
+          phrase: "DRAGON SLAYER",
+          category: "Heroic Title",
+          difficulty: "easy",
+        },
+        { phrase: "DARK FOREST", category: "Spooky Place", difficulty: "easy" },
+      ],
+      medium: [
+        {
+          phrase: "THE TREASURE IS CURSED",
+          category: "Adventure Warning",
+          difficulty: "medium",
+        },
+        {
+          phrase: "GUARDIAN OF THE RUINS",
+          category: "Mythic Title",
+          difficulty: "medium",
+        },
+        {
+          phrase: "SWORD IN THE STONE",
+          category: "Legendary Artifact",
+          difficulty: "medium",
+        },
+      ],
+      hard: [
+        {
+          phrase: "SHADOW OF THE FORGOTTEN KING",
+          category: "Dark Legacy",
+          difficulty: "hard",
+        },
+        {
+          phrase: "KEEPER OF THE SACRED FLAME",
+          category: "Holy Guardian",
+          difficulty: "hard",
+        },
+        {
+          phrase: "PROPHECY OF THE CRIMSON MOON",
+          category: "Dark Omen",
+          difficulty: "hard",
+        },
+      ],
+      "very-hard": [
+        {
+          phrase: "CHRONICLE OF THE FALLEN EMPIRE STATE",
+          category: "Ancient History",
+          difficulty: "very-hard",
+        },
+        {
+          phrase: "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+          category: "Mystic Secret",
+          difficulty: "very-hard",
+        },
+        {
+          phrase: "LEGEND OF THE ETERNAL TWILIGHT REALM",
+          category: "Mythic Dimension",
+          difficulty: "very-hard",
+        },
+      ],
+    };
+    const puzzles = fallbackPuzzles[difficulty];
+    return puzzles[Math.floor(Math.random() * puzzles.length)];
+  }
+
   try {
-    // Use the generate-puzzle API internally
+    const difficultyConfig: Record<
+      PuzzleDifficulty,
+      { wordCount: string; complexity: string; examples: string[] }
+    > = {
+      easy: {
+        wordCount: "2 to 3 words",
+        complexity: "Simple, common words. Easy to guess.",
+        examples: [
+          "DRAGON SLAYER",
+          "MAGIC SWORD",
+          "DARK FOREST",
+          "LOST TREASURE",
+        ],
+      },
+      medium: {
+        wordCount: "3 to 4 words",
+        complexity:
+          "Moderately challenging. Mix of common and less common words.",
+        examples: [
+          "GUARDIAN OF THE GATE",
+          "CURSE OF THE MUMMY",
+          "KEEPER OF THE FLAME",
+          "THRONE OF BONES",
+        ],
+      },
+      hard: {
+        wordCount: "4 to 5 words",
+        complexity:
+          "Challenging phrases with less common words. More abstract concepts.",
+        examples: [
+          "SHADOW OF THE FORGOTTEN REALM",
+          "WHISPERS IN THE ANCIENT VOID",
+          "CHRONICLE OF ETERNAL DARKNESS",
+          "GUARDIAN OF CELESTIAL SECRETS",
+        ],
+      },
+      "very-hard": {
+        wordCount: "5 to 6 words",
+        complexity:
+          "Very challenging. Complex phrases with uncommon words and abstract ideas.",
+        examples: [
+          "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+          "PROPHECY OF THE WANDERING SHADOW LORDS",
+          "REMNANTS OF THE CELESTIAL GUARDIAN ORDER",
+          "CHRONICLE OF THE FALLEN CRYSTAL EMPIRE",
+        ],
+      },
+    };
+
+    const config = difficultyConfig[difficulty];
+    const examplesText = config.examples
+      .map((ex, i) => `${i + 1}. "${ex}"`)
+      .join("\n");
+
+    const systemPrompt = `Create a puzzle phrase for an adventure game like Wheel of Fortune.
+
+DIFFICULTY LEVEL: ${difficulty.toUpperCase()}
+
+**IMPORTANT: Respond with ONLY the JSON. Do not think out loud or explain your reasoning.**
+
+REQUIREMENTS:
+- ${config.wordCount} total
+- ${config.complexity}
+- CAPITAL LETTERS ONLY (no lowercase)
+- NO punctuation, numbers, or special characters
+- NO PROPER NOUNS (no specific names of people, places, or unique entities)
+- Adventure/fantasy themed
+- Exciting and evocative
+- Use only common/generic nouns and descriptive words
+
+PHRASE TYPES (rotate through these):
+1. Action Imperatives: "CROSS THE BURNING BRIDGE"
+2. Dangerous Locations: "DEPTHS OF THE ABYSS"
+3. Mythic Creatures: "GUARDIAN OF THE GATE"
+4. Legendary Objects: "CROWN OF THE FORGOTTEN KING"
+5. Heroic Titles: "SLAYER OF SHADOW BEASTS"
+6. Dramatic Warnings: "BEWARE THE CRIMSON MOON"
+7. Ancient Mysteries: "RIDDLE OF THE STONES"
+8. Epic Events: "BATTLE FOR THE REALM"
+9. Supernatural Phenomena: "GHOSTS OF THE MANOR"
+10. Quest Objectives: "RESCUE THE LOST PRINCE"
+
+EXAMPLES FOR THIS DIFFICULTY:
+${examplesText}
+
+AVOID THESE:
+- Proper nouns (Zeus, Atlantis, Thor, Rome, etc.)
+- Specific character names or locations
+- "SEEK THE ANCIENT..."
+- "FIND THE LOST..."
+- "ESCAPE FROM THE..."
+- "DEFEAT THE EVIL..."
+- Generic "THE TREASURE" phrases
+
+Respond with ONLY this JSON (no extra text):
+{ "phrase": "YOUR PHRASE", "category": "Category Name" }
+
+Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
+
     const response = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-      }/api/generate-puzzle`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ difficulty }),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: systemPrompt }] }],
+          generationConfig: {
+            temperature: 1.3,
+            maxOutputTokens: 5000,
+            topP: 0.95,
+          },
+        }),
       }
     );
 
-    if (response.ok) {
-      return await response.json();
+    console.log("📦 Gemini API response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        "❌ Gemini API error in create route:",
+        response.status,
+        errorText
+      );
+      throw new Error(`Gemini API failed with status ${response.status}`);
     }
-    throw new Error("Failed to generate puzzle");
+
+    const data = await response.json();
+    console.log(
+      "📦 Raw puzzle response:",
+      JSON.stringify(data).substring(0, 200)
+    );
+
+    if (
+      !data.candidates ||
+      !data.candidates[0] ||
+      !data.candidates[0].content ||
+      !data.candidates[0].content.parts
+    ) {
+      console.error("❌ Unexpected puzzle response structure:", data);
+      throw new Error("Gemini API returned unexpected response structure");
+    }
+
+    console.log("✅ Gemini API response received in create route");
+    const text = data.candidates[0].content.parts[0].text.trim();
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const puzzle = JSON.parse(jsonMatch[0]);
+      console.log("✅ Generated puzzle in create route:", puzzle.phrase);
+      return {
+        phrase: puzzle.phrase.toUpperCase(),
+        category: puzzle.category,
+        difficulty,
+      };
+    }
+
+    console.log(
+      "⚠️ No JSON found in Gemini response in create route, using fallback"
+    );
+    return {
+      phrase: "GUARDIAN OF THE RUINS",
+      category: "Mythic Protector",
+      difficulty,
+    };
   } catch (error) {
-    console.error("Error generating puzzle:", error);
+    console.error("Error generating puzzle in create route:", error);
     // Fallback puzzles organized by difficulty
     const fallbackPuzzles: Record<
       PuzzleDifficulty,
@@ -140,6 +373,8 @@ async function generateScenario(recentScenarios: string[] = []) {
 
     const systemPrompt = `Create a dramatic adventure challenge for a game (2-3 sentences max).
 
+**IMPORTANT: Respond directly with ONLY the scenario text. Do not think out loud or explain your reasoning.**
+
 REQUIREMENTS:
 ✓ Present a clear danger or obstacle
 ✓ Give players a meaningful choice
@@ -178,7 +413,7 @@ SPECIFIC SCENARIO IDEAS:
 Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
@@ -192,7 +427,7 @@ Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
           ],
           generationConfig: {
             temperature: 1.4,
-            maxOutputTokens: 150,
+            maxOutputTokens: 5000,
             topP: 0.95,
           },
         }),
@@ -204,7 +439,28 @@ Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
     }
 
     const data = await response.json();
-    const scenario = data.candidates[0].content.parts[0].text.trim();
+
+    if (
+      !data.candidates ||
+      !data.candidates[0] ||
+      !data.candidates[0].content
+    ) {
+      console.error("❌ Unexpected scenario response structure:", data);
+      throw new Error("Gemini API returned unexpected response structure");
+    }
+
+    const candidate = data.candidates[0];
+    if (candidate.finishReason === "MAX_TOKENS") {
+      console.error("❌ Scenario response was truncated (MAX_TOKENS).");
+      throw new Error("Response truncated");
+    }
+
+    if (!candidate.content.parts || !candidate.content.parts[0]) {
+      console.error("❌ Missing parts in scenario content:", candidate.content);
+      throw new Error("Missing response parts");
+    }
+
+    const scenario = candidate.content.parts[0].text.trim();
     return scenario;
   } catch (error) {
     console.error("Error generating scenario:", error);

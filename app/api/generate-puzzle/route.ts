@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
+      console.log("⚠️ No GEMINI_API_KEY found, using fallback puzzles");
       // Fallback puzzles organized by difficulty
       const fallbackPuzzles: Record<
         PuzzleDifficulty,
@@ -162,7 +163,7 @@ Respond with ONLY this JSON (no extra text):
 Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
@@ -184,15 +185,19 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
     );
 
     if (!response.ok) {
-      throw new Error("Gemini API failed");
+      const errorText = await response.text();
+      console.error("Gemini API error:", response.status, errorText);
+      throw new Error(`Gemini API failed with status ${response.status}`);
     }
 
     const data = await response.json();
+    console.log("✅ Gemini API response received");
     const text = data.candidates[0].content.parts[0].text.trim();
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const puzzle = JSON.parse(jsonMatch[0]);
+      console.log("✅ Generated puzzle:", puzzle.phrase);
       return NextResponse.json({
         phrase: puzzle.phrase.toUpperCase(),
         category: puzzle.category,
@@ -200,6 +205,7 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
       });
     }
 
+    console.log("⚠️ No JSON found in response, using fallback");
     // Fallback
     return NextResponse.json({
       phrase: "GUARDIAN OF THE RUINS",

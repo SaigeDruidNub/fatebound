@@ -80,7 +80,6 @@ export async function getGame(gameId: string) {
     if (isMongoConfigured()) {
       const mongo = await getMongoClient();
       if (mongo?.gamesCollection) {
-        console.log(`🔍 Fetching game ${gameId} from MongoDB...`);
         const doc = await mongo.gamesCollection.findOne({ gameId });
         const game = doc ? deserializeFromStorage(doc.gameState) : null;
         console.log(`Getting game ${gameId}:`, game ? "found" : "not found");
@@ -89,7 +88,6 @@ export async function getGame(gameId: string) {
     }
 
     // Fallback to in-memory storage
-    console.log(`🔍 Fetching game ${gameId} from local memory...`);
     const game = localGames.get(gameId);
     console.log(`Getting game ${gameId}:`, game ? "found" : "not found");
     return game;

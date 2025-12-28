@@ -132,7 +132,7 @@ Does this action succeed? Consider: Is it thoughtful? Does it address the danger
 Respond ONLY with valid JSON.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {

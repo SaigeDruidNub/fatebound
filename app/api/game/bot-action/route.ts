@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     if (process.env.GEMINI_API_KEY) {
       try {
         const model = genAI.getGenerativeModel({
-          model: "gemini-1.5-pro",
+          model: "gemini-3-pro-preview",
           generationConfig: {
             temperature: 1.0,
             topP: 0.9,
