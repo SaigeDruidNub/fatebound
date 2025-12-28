@@ -529,13 +529,13 @@ export default function Home() {
     const words = gameState.puzzle.phrase.split(" ");
 
     return (
-      <div className="mb-6 rounded-lg bg-[#1B2A30] p-6 border-2 border-[#B06821]">
-        <div className="text-center mb-4">
-          <p className="text-[#B06821] font-bold text-lg">
+      <div className="mb-4 sm:mb-6 rounded-lg bg-[#1B2A30] p-3 sm:p-6 border-2 border-[#B06821]">
+        <div className="text-center mb-3 sm:mb-4">
+          <p className="text-[#B06821] font-bold text-base sm:text-lg">
             {gameState.puzzle.category}
           </p>
         </div>
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
           {words.map((word, wordIdx) => (
             <div key={wordIdx} className="flex gap-1">
               {word.split("").map((letter, letterIdx) => {
@@ -545,7 +545,7 @@ export default function Home() {
                 return (
                   <div
                     key={letterIdx}
-                    className="w-10 h-14 sm:w-12 sm:h-16 border-2 border-white bg-white/10 flex items-center justify-center text-2xl font-bold text-white"
+                    className="w-8 h-12 sm:w-10 sm:h-14 md:w-12 md:h-16 border-2 border-white bg-white/10 flex items-center justify-center text-lg sm:text-2xl font-bold text-white"
                   >
                     {isRevealed ? letter.toUpperCase() : ""}
                   </div>
@@ -561,8 +561,8 @@ export default function Home() {
   // Lobby Screen
   if (!gameState || gameState.phase === "lobby") {
     return (
-      <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-[#511B18] via-[#1B2A30] to-[#511B18] font-sans pt-12">
-        <main className="w-full max-w-2xl p-8">
+      <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-[#511B18] via-[#1B2A30] to-[#511B18] font-sans pt-4 sm:pt-12 px-4">
+        <main className="w-full max-w-2xl p-4 sm:p-8">
           <div className="flex justify-center mb-4">
             <Image
               src="/Fatebound.png"
@@ -570,7 +570,7 @@ export default function Home() {
               width={600}
               height={400}
               priority
-              className="max-w-full h-auto"
+              className="max-w-full h-auto w-full sm:w-auto"
             />
           </div>
 
@@ -587,11 +587,11 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   onClick={createGame}
                   disabled={loading}
-                  className="flex-1 rounded-lg bg-[#9E2C21] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#511B18] disabled:bg-[#1B2A30]"
+                  className="flex-1 rounded-lg bg-[#9E2C21] px-6 py-4 font-semibold text-white transition-colors hover:bg-[#511B18] disabled:bg-[#1B2A30] text-base sm:text-lg"
                 >
                   Create Game
                 </button>
@@ -617,7 +617,7 @@ export default function Home() {
               <button
                 onClick={joinGame}
                 disabled={loading}
-                className="w-full rounded-lg bg-[#B06821] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#9E2C21] disabled:bg-[#1B2A30]"
+                className="w-full rounded-lg bg-[#B06821] px-6 py-4 font-semibold text-white transition-colors hover:bg-[#9E2C21] disabled:bg-[#1B2A30] text-base sm:text-lg"
               >
                 Join Game
               </button>
@@ -697,23 +697,25 @@ export default function Home() {
   if (gameState.phase === "game-over") {
     const winner = gameState.players.find((p) => p.id === gameState.winner);
     return (
-      <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-[#511B18] via-[#1B2A30] to-[#511B18] font-sans pt-12">
-        <main className="w-full max-w-4xl p-8">
-          <div className="text-center space-y-6 bg-[#1B2A30]/60 p-12 rounded-lg backdrop-blur">
+      <div className="flex min-h-screen items-start justify-center bg-gradient-to-br from-[#511B18] via-[#1B2A30] to-[#511B18] font-sans pt-4 sm:pt-12 px-4">
+        <main className="w-full max-w-4xl p-4 sm:p-8">
+          <div className="text-center space-y-4 sm:space-y-6 bg-[#1B2A30]/60 p-6 sm:p-12 rounded-lg backdrop-blur">
             <div className="flex justify-center mb-2">
               <Image
                 src="/Fatebound.png"
                 alt="Fatebound - Where Words Decide"
                 width={500}
                 height={333}
-                className="max-w-full h-auto"
+                className="max-w-full h-auto w-full sm:w-auto"
               />
             </div>
-            <h1 className="text-5xl font-bold text-white mb-4">Game Over!</h1>
-            <div className="text-3xl text-[#B06821] font-bold">
+            <h1 className="text-3xl sm:text-5xl font-bold text-white mb-4">
+              Game Over!
+            </h1>
+            <div className="text-3xl sm:text-3xl md:text-3xl text-[#B06821] font-bold">
               🏆 {winner?.name} wins! 🏆
             </div>
-            <div className="text-xl text-white">
+            <div className="text-lg sm:text-xl text-white">
               The puzzle was:{" "}
               <span className="text-[#B06821]">{gameState.puzzle.phrase}</span>
             </div>
@@ -751,10 +753,10 @@ export default function Home() {
 
   // Main Game Screen
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-[#511B18] via-[#1B2A30] to-[#511B18] font-sans p-4">
-      <main className="w-full max-w-7xl mx-auto flex gap-4">
+    <div className="flex min-h-screen bg-gradient-to-br from-[#511B18] via-[#1B2A30] to-[#511B18] font-sans p-2 sm:p-4">
+      <main className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-4">
         {/* Left sidebar - Players */}
-        <div className="w-64 space-y-4">
+        <div className="w-full lg:w-64 space-y-4 lg:order-first order-last">
           <div className="bg-[#1B2A30]/60 p-4 rounded-lg backdrop-blur">
             <h3 className="text-white font-bold mb-3">Players</h3>
             <div className="space-y-2">
@@ -833,21 +835,21 @@ export default function Home() {
           {me?.isAlive && (
             <>
               {gameState.phase === "playing" && isMyTurn && (
-                <div className="space-y-4 bg-[#1B2A30]/60 p-6 rounded-lg backdrop-blur">
-                  <p className="text-white font-bold">
+                <div className="space-y-3 sm:space-y-4 bg-[#1B2A30]/60 p-4 sm:p-6 rounded-lg backdrop-blur">
+                  <p className="text-white font-bold text-base sm:text-lg">
                     Your turn! What do you do?
                   </p>
                   <textarea
                     value={action}
                     onChange={(e) => setAction(e.target.value)}
                     placeholder="Describe your action..."
-                    className="w-full rounded-lg bg-[#305853] p-4 text-white placeholder-[#305853]/60 focus:outline-none focus:ring-2 focus:ring-[#B06821] min-h-[100px] resize-none border border-[#B06821]/30"
+                    className="w-full rounded-lg bg-[#305853] p-4 text-white text-base placeholder-[#305853]/60 focus:outline-none focus:ring-2 focus:ring-[#B06821] min-h-[100px] resize-none border border-[#B06821]/30"
                     disabled={loading}
                   />
                   <button
                     onClick={submitAction}
                     disabled={loading || !action.trim()}
-                    className="w-full rounded-lg bg-[#9E2C21] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#511B18] disabled:bg-[#1B2A30] disabled:cursor-not-allowed"
+                    className="w-full rounded-lg bg-[#9E2C21] px-6 py-4 text-base sm:text-lg font-semibold text-white transition-colors hover:bg-[#511B18] disabled:bg-[#1B2A30] disabled:cursor-not-allowed"
                   >
                     {loading ? "Processing..." : "Take Action"}
                   </button>
@@ -855,13 +857,13 @@ export default function Home() {
               )}
 
               {gameState.phase === "letter-selection" && isMyTurn && (
-                <div className="space-y-4 bg-[#1B2A30]/60 p-6 rounded-lg backdrop-blur">
-                  <p className="text-white font-bold">
+                <div className="space-y-3 sm:space-y-4 bg-[#1B2A30]/60 p-4 sm:p-6 rounded-lg backdrop-blur">
+                  <p className="text-white font-bold text-base sm:text-lg">
                     You survived! Choose a letter or solve the puzzle:
                   </p>
 
                   <div>
-                    <label className="block text-white mb-2">
+                    <label className="block text-white mb-2 text-sm sm:text-base">
                       Pick a Letter:
                     </label>
                     <div className="flex gap-2">
@@ -872,13 +874,13 @@ export default function Home() {
                         onChange={(e) =>
                           setSelectedLetter(e.target.value.toUpperCase())
                         }
-                        className="w-20 rounded-lg bg-[#305853] p-3 text-white text-center text-2xl border border-[#B06821] focus:outline-none focus:ring-2 focus:ring-[#B06821]"
+                        className="w-16 sm:w-20 rounded-lg bg-[#305853] p-3 sm:p-4 text-white text-center text-2xl sm:text-3xl border border-[#B06821] focus:outline-none focus:ring-2 focus:ring-[#B06821]"
                         placeholder="?"
                       />
                       <button
                         onClick={submitLetter}
                         disabled={loading || !selectedLetter}
-                        className="flex-1 rounded-lg bg-[#B06821] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#9E2C21] disabled:bg-[#1B2A30]"
+                        className="flex-1 rounded-lg bg-[#B06821] px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white transition-colors hover:bg-[#9E2C21] disabled:bg-[#1B2A30]"
                       >
                         Submit Letter
                       </button>
@@ -892,23 +894,23 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-white mb-2">
+                    <label className="block text-white mb-2 text-sm sm:text-base">
                       Solve the Puzzle:
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
                         value={puzzleGuess}
                         onChange={(e) =>
                           setPuzzleGuess(e.target.value.toUpperCase())
                         }
-                        className="flex-1 rounded-lg bg-[#305853] p-3 text-white border border-[#B06821] focus:outline-none focus:ring-2 focus:ring-[#B06821]"
+                        className="flex-1 rounded-lg bg-[#305853] p-3 sm:p-4 text-base text-white border border-[#B06821] focus:outline-none focus:ring-2 focus:ring-[#B06821]"
                         placeholder="Enter full phrase"
                       />
                       <button
                         onClick={guessPuzzle}
                         disabled={loading || !puzzleGuess.trim()}
-                        className="rounded-lg bg-[#9E2C21] px-6 py-3 font-semibold text-white transition-colors hover:bg-[#511B18] disabled:bg-[#1B2A30]"
+                        className="rounded-lg bg-[#9E2C21] px-6 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white transition-colors hover:bg-[#511B18] disabled:bg-[#1B2A30] whitespace-nowrap"
                       >
                         Solve
                       </button>
