@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Player, GamePhase } from "@/types/game";
 
@@ -31,6 +31,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [lastOutcome, setLastOutcome] = useState("");
   const [botThinking, setBotThinking] = useState(false);
+  const botActionInProgress = useRef(false);
 
   // Sync gameId from gameState if needed
   useEffect(() => {
@@ -63,15 +64,14 @@ export default function Home() {
 
   // Auto-play bot turns
   useEffect(() => {
-    if (!gameState || botThinking || loading) return;
+    if (!gameState || botThinking || loading || botActionInProgress.current)
+      return;
 
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
 
-    if (
-      currentPlayer?.isBot &&
-      (gameState.phase === "playing" || gameState.phase === "letter-selection")
-    ) {
-      // Wait a bit so it feels natural
+    // Bot takes action during playing phase
+    if (currentPlayer?.isBot && gameState.phase === "playing") {
+      botActionInProgress.current = true;
       setBotThinking(true);
 
       setTimeout(async () => {
@@ -87,6 +87,7 @@ export default function Home() {
           if (data.error) {
             console.error("Bot action error:", data.error);
             setBotThinking(false);
+            botActionInProgress.current = false;
             return;
           }
 
@@ -104,20 +105,80 @@ export default function Home() {
           console.error("Error processing bot action:", error);
         } finally {
           setBotThinking(false);
+          botActionInProgress.current = false;
         }
-      }, 1500 + Math.random() * 1000); // Random delay 1.5-2.5 seconds
+      }, 1500 + Math.random() * 1000);
 
-      return; // Exit early to prevent running the auto-continue logic
+      return;
+    }
+
+    // Bot selects letter during letter-selection phase
+    if (currentPlayer?.isBot && gameState.phase === "letter-selection") {
+      botActionInProgress.current = true;
+      setBotThinking(true);
+
+      setTimeout(async () => {
+        try {
+          // Pick a random letter that hasn't been revealed yet
+          const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+          const availableLetters = alphabet
+            .split("")
+            .filter((l) => !gameState.puzzle.revealedLetters.includes(l));
+
+          if (availableLetters.length > 0) {
+            const randomLetter =
+              availableLetters[
+                Math.floor(Math.random() * availableLetters.length)
+              ];
+
+            const response = await fetch("/api/game/letter", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                gameId,
+                playerId: currentPlayer.id,
+                letter: randomLetter,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+              console.error("Bot letter error:", data.error);
+            } else {
+              setGameState(data.gameState);
+              if (data.message) {
+                setMessage(
+                  `${currentPlayer.name} guesses ${randomLetter}: ${data.message}`
+                );
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error processing bot letter:", error);
+        } finally {
+          setBotThinking(false);
+          botActionInProgress.current = false;
+        }
+      }, 1500 + Math.random() * 1000);
+
+      return;
     }
 
     // Auto-continue for bots after failure
-    if (gameState.phase === "waiting-continue" && currentPlayer?.isBot) {
+    if (
+      gameState.phase === "waiting-continue" &&
+      currentPlayer?.isBot &&
+      !botActionInProgress.current
+    ) {
+      botActionInProgress.current = true;
       setBotThinking(true);
       setTimeout(async () => {
         try {
           await continueGame();
         } finally {
           setBotThinking(false);
+          botActionInProgress.current = false;
         }
       }, 2000);
     }
