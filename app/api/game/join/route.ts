@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`🎮 Attempting to join game: ${gameId}, player: ${playerName}`);
 
-    const gameState = getGame(gameId);
+    const gameState = await getGame(gameId);
 
     if (!gameState) {
       console.error(`❌ Game ${gameId} not found`);
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     };
 
     gameState.players.push(player);
-    setGame(gameId, gameState);
+    await setGame(gameId, gameState);
 
     console.log(`✅ Player ${playerName} joined game ${gameId}`);
 

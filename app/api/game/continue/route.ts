@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   try {
     const { gameId } = await request.json();
 
-    const gameState = getGame(gameId);
+    const gameState = await getGame(gameId);
 
     if (!gameState) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       gameState.currentScenario = await generateScenario();
     }
 
-    setGame(gameId, gameState);
+    await setGame(gameId, gameState);
 
     return NextResponse.json({
       gameState: serializeGameState(gameState),

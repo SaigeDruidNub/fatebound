@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gameState = getGame(gameId);
+    const gameState = await getGame(gameId);
 
     if (!gameState) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       gameState.phase = "waiting-continue";
     }
 
-    setGame(gameId, gameState);
+    await setGame(gameId, gameState);
 
     return NextResponse.json({
       gameState: serializeGameState(gameState),
@@ -251,6 +251,5 @@ function serializeGameState(gameState: any) {
   };
 }
 function generateScenario(roundNumber: any): any {
-    throw new Error("Function not implemented.");
+  throw new Error("Function not implemented.");
 }
-

@@ -1,88 +1,63 @@
-import fs from "fs";
-import path from "path";
+import { kv } from "@vercel/kv";
 
-// File-based storage to survive HMR restarts in development
-const STORAGE_FILE = path.join(process.cwd(), ".tmp-game-storage.json");
-
-// In-memory game storage (in production, use a database)
-const games = new Map<string, any>();
-let gamesLoaded = false;
-
-// Load games from file on startup
-function loadGamesFromFile() {
-  if (gamesLoaded) return; // Only load once
-
-  try {
-    if (fs.existsSync(STORAGE_FILE)) {
-      const data = fs.readFileSync(STORAGE_FILE, "utf-8");
-      const parsed = JSON.parse(data);
-      Object.entries(parsed).forEach(([id, state]: [string, any]) => {
-        // Convert revealedLetters array back to Set
-        if (state.puzzle && Array.isArray(state.puzzle.revealedLetters)) {
-          state.puzzle.revealedLetters = new Set(state.puzzle.revealedLetters);
-        }
-        games.set(id, state);
-      });
-      gamesLoaded = true;
-      console.log(`📂 Loaded ${games.size} games from persistent storage`);
-    }
-  } catch (error) {
-    console.error("Error loading games from file:", error);
-  }
+// Helper to serialize game state for storage
+function serializeForStorage(gameState: any) {
+  return {
+    ...gameState,
+    puzzle: {
+      ...gameState.puzzle,
+      revealedLetters: Array.from(gameState.puzzle.revealedLetters || []),
+    },
+  };
 }
 
-// Save games to file
-function saveGamesToFile() {
-  try {
-    const gamesObj: Record<string, any> = {};
-    games.forEach((state, id) => {
-      gamesObj[id] = state;
-    });
-    fs.writeFileSync(STORAGE_FILE, JSON.stringify(gamesObj, null, 2));
-  } catch (error) {
-    console.error("Error saving games to file:", error);
-  }
+// Helper to deserialize game state from storage
+function deserializeFromStorage(gameState: any) {
+  if (!gameState) return null;
+  return {
+    ...gameState,
+    puzzle: {
+      ...gameState.puzzle,
+      revealedLetters: new Set(gameState.puzzle.revealedLetters || []),
+    },
+  };
 }
 
-// Load on initialization
-loadGamesFromFile();
-
-export function getGame(gameId: string) {
-  let game = games.get(gameId);
-
-  // If game not found, try reloading from file (in case of HMR or server restart)
-  if (!game) {
-    console.warn(
-      `⚠️ Game ${gameId} not found in memory (${games.size} games loaded) - attempting to reload from storage...`
+export async function getGame(gameId: string) {
+  try {
+    console.log(`🔍 Fetching game ${gameId} from KV...`);
+    const gameState = await kv.get(`game:${gameId}`);
+    const game = deserializeFromStorage(gameState);
+    console.log(
+      `Getting game ${gameId}:`,
+      game ? "found" : "not found"
     );
-    gamesLoaded = false; // Reset flag to allow reload
-    loadGamesFromFile();
-    game = games.get(gameId);
+    return game;
+  } catch (error) {
+    console.error(`Error fetching game ${gameId}:`, error);
+    return null;
   }
-
-  // Convert revealedLetters array back to Set if needed (from JSON deserialization)
-  if (game && game.puzzle && Array.isArray(game.puzzle.revealedLetters)) {
-    game.puzzle.revealedLetters = new Set(game.puzzle.revealedLetters);
-  }
-
-  console.log(
-    `Getting game ${gameId}:`,
-    game ? "found" : "not found",
-    `(total games: ${games.size})`
-  );
-  return game;
 }
 
-export function setGame(gameId: string, gameState: any) {
-  console.log(`Setting game ${gameId} (total games before: ${games.size})`);
-  games.set(gameId, gameState);
-  saveGamesToFile();
-  console.log(`✅ Game saved (total games: ${games.size})`);
+export async function setGame(gameId: string, gameState: any) {
+  try {
+    console.log(`💾 Saving game ${gameId} to KV...`);
+    const serialized = serializeForStorage(gameState);
+    await kv.set(`game:${gameId}`, serialized, { ex: 86400 }); // Expire after 24 hours
+    console.log(`✅ Game ${gameId} saved successfully`);
+  } catch (error) {
+    console.error(`Error saving game ${gameId}:`, error);
+    throw error;
+  }
 }
 
-export function deleteGame(gameId: string) {
-  games.delete(gameId);
-  saveGamesToFile();
+export async function deleteGame(gameId: string) {
+  try {
+    await kv.del(`game:${gameId}`);
+    console.log(`🗑️ Game ${gameId} deleted`);
+  } catch (error) {
+    console.error(`Error deleting game ${gameId}:`, error);
+  }
 }
 
 // List of puzzles for the game

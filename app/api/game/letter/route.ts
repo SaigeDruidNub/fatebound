@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const { gameId, playerId, letter } = await request.json();
     console.log("Letter submission:", { gameId, playerId, letter });
 
-    const gameState = getGame(gameId);
+    const gameState = await getGame(gameId);
 
     if (!gameState) {
       console.error("Game not found for letter submission:", gameId);
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Move to next player
     await moveToNextPlayer(gameState);
 
-    setGame(gameId, gameState);
+    await setGame(gameId, gameState);
 
     return NextResponse.json({
       gameState: serializeGameState(gameState),

@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const { gameId, playerId, guess } = await request.json();
 
-    const gameState = getGame(gameId);
+    const gameState = await getGame(gameId);
 
     if (!gameState) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       currentPlayer.score += 100;
       gameState.phase = "game-over";
       gameState.winner = currentPlayer.id;
-      setGame(gameId, gameState);
+      await setGame(gameId, gameState);
 
       return NextResponse.json({
         gameState: serializeGameState(gameState),
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         gameState.phase = "playing";
       }
 
-      setGame(gameId, gameState);
+      await setGame(gameId, gameState);
 
       return NextResponse.json({
         gameState: serializeGameState(gameState),

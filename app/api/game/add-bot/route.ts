@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { gameId } = await request.json();
     console.log("Add bot request for game:", gameId);
 
-    const gameState = getGame(gameId);
+    const gameState = await getGame(gameId);
 
     if (!gameState) {
       console.error("Game not found when adding bot:", gameId);
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     };
 
     gameState.players.push(bot);
-    setGame(gameId, gameState);
+    await setGame(gameId, gameState);
 
     return NextResponse.json({
       gameState: serializeGameState(gameState),
