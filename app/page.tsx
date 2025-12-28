@@ -33,9 +33,15 @@ export default function Home() {
   const [lastOutcome, setLastOutcome] = useState("");
   const [botThinking, setBotThinking] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+  const [leaderboardDifficulty, setLeaderboardDifficulty] = useState<
+    PuzzleDifficulty | "all"
+  >("all");
   const [puzzleDifficulty, setPuzzleDifficulty] =
     useState<PuzzleDifficulty>("medium");
   const botActionInProgress = useRef(false);
+  const leaderboardSubmitted = useRef(false);
 
   // Sync gameId from gameState if needed
   useEffect(() => {
@@ -44,6 +50,38 @@ export default function Home() {
       setGameId(gameState.id);
     }
   }, [gameState, gameId]);
+
+  // Submit to leaderboard when game ends
+  useEffect(() => {
+    if (
+      gameState?.phase === "game-over" &&
+      gameState.winner &&
+      !leaderboardSubmitted.current
+    ) {
+      leaderboardSubmitted.current = true;
+      const winner = gameState.players.find((p) => p.id === gameState.winner);
+
+      if (winner && winner.score > 0) {
+        fetch("/api/leaderboard/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playerName: winner.name,
+            score: winner.score,
+            difficulty: gameState.puzzle.difficulty,
+            gameId: gameState.id,
+          }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            console.log("Leaderboard entry submitted:", data);
+          })
+          .catch((error) => {
+            console.error("Failed to submit leaderboard entry:", error);
+          });
+      }
+    }
+  }, [gameState?.phase, gameState?.winner, gameState]);
 
   // Poll for game state updates
   useEffect(() => {
@@ -260,6 +298,28 @@ export default function Home() {
     }
   };
 
+  const fetchLeaderboard = async (difficulty?: PuzzleDifficulty | "all") => {
+    try {
+      const url =
+        difficulty && difficulty !== "all"
+          ? `/api/leaderboard?difficulty=${difficulty}&limit=10`
+          : `/api/leaderboard?limit=10`;
+
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setLeaderboardData(data.leaderboard);
+      }
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+    }
+  };
+
+  const openLeaderboard = async () => {
+    setShowLeaderboard(true);
+    await fetchLeaderboard(leaderboardDifficulty);
+  };
+
   const startGame = async () => {
     setLoading(true);
     try {
@@ -470,14 +530,26 @@ export default function Home() {
         body: JSON.stringify({ gameId, playerId, guess: puzzleGuess }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Guess submission error:", errorData);
-        setMessage(errorData.error || "Failed to submit guess");
+        // Handle validation errors (like punctuation) without clearing the guess
+        if (data.error === "No punctuation allowed") {
+          setMessage(
+            data.message || "Please remove punctuation from your guess"
+          );
+          // Update game state if provided but don't clear the guess
+          if (data.gameState) {
+            setGameState(data.gameState);
+          }
+          return;
+        }
+
+        console.error("Guess submission error:", data);
+        setMessage(data.error || "Failed to submit guess");
         return;
       }
 
-      const data = await response.json();
       if (data.gameState) {
         setGameState(data.gameState);
       }
@@ -581,9 +653,15 @@ export default function Home() {
           <div className="flex justify-center mb-6">
             <button
               onClick={() => setShowHowToPlay(true)}
-              className="text-[#B06821] hover:text-white transition-colors underline text-sm sm:text-base"
+              className="text-[#B06821] hover:text-white transition-colors underline text-sm sm:text-base mr-4"
             >
               📖 How to Play
+            </button>
+            <button
+              onClick={openLeaderboard}
+              className="text-[#B06821] hover:text-white transition-colors underline text-sm sm:text-base"
+            >
+              🏆 Leaderboard
             </button>
           </div>
 
@@ -924,6 +1002,117 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Leaderboard Modal */}
+        {showLeaderboard && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowLeaderboard(false)}
+          >
+            <div
+              className="bg-[#1B2A30] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border-2 border-[#B06821]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-[#B06821]">
+                    🏆 Leaderboard
+                  </h2>
+                  <button
+                    onClick={() => setShowLeaderboard(false)}
+                    className="text-white hover:text-[#B06821] text-2xl transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-white mb-2 text-sm">
+                    Filter by Difficulty:
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {["all", "easy", "medium", "hard", "very-hard"].map(
+                      (diff) => (
+                        <button
+                          key={diff}
+                          onClick={async () => {
+                            const newDiff = diff as PuzzleDifficulty | "all";
+                            setLeaderboardDifficulty(newDiff);
+                            await fetchLeaderboard(newDiff);
+                          }}
+                          className={`rounded px-3 py-2 text-xs font-semibold transition-colors ${
+                            leaderboardDifficulty === diff
+                              ? "bg-[#B06821] text-white"
+                              : "bg-[#305853] text-white hover:bg-[#B06821]/50"
+                          }`}
+                        >
+                          {diff === "very-hard"
+                            ? "V.Hard"
+                            : diff.charAt(0).toUpperCase() + diff.slice(1)}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {leaderboardData.length === 0 ? (
+                    <div className="text-center text-[#305853] py-8">
+                      No entries yet. Be the first to make it to the
+                      leaderboard!
+                    </div>
+                  ) : (
+                    leaderboardData.map((entry, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between bg-[#305853]/40 p-4 rounded border border-[#305853]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl font-bold text-[#B06821] w-8">
+                            {index === 0
+                              ? "🥇"
+                              : index === 1
+                              ? "🥈"
+                              : index === 2
+                              ? "🥉"
+                              : `${index + 1}.`}
+                          </span>
+                          <div>
+                            <div className="text-white font-semibold">
+                              {entry.playerName}
+                            </div>
+                            <div className="text-xs text-[#305853] capitalize">
+                              {entry.difficulty === "very-hard"
+                                ? "Very Hard"
+                                : entry.difficulty}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[#B06821] font-bold text-lg">
+                            {entry.score}
+                          </div>
+                          <div className="text-xs text-[#305853]">
+                            {new Date(entry.date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={() => setShowLeaderboard(false)}
+                    className="rounded-lg bg-[#9E2C21] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#511B18]"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -974,12 +1163,20 @@ export default function Home() {
               </div>
             </div>
 
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-8 rounded-lg bg-[#9E2C21] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#511B18]"
-            >
-              Play Again
-            </button>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={openLeaderboard}
+                className="mt-8 rounded-lg bg-[#B06821] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#9E2C21]"
+              >
+                🏆 View Leaderboard
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-8 rounded-lg bg-[#9E2C21] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#511B18]"
+              >
+                Play Again
+              </button>
+            </div>
           </div>
         </main>
       </div>

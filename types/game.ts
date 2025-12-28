@@ -39,3 +39,11 @@ export type ActionResult = {
   outcome: string;
   nextScenario?: string;
 };
+
+export type LeaderboardEntry = {
+  playerName: string;
+  score: number;
+  difficulty: PuzzleDifficulty;
+  date: number;
+  gameId: string;
+};

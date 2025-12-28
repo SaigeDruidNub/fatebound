@@ -20,6 +20,20 @@ export async function POST(request: NextRequest) {
     const correctAnswer = gameState.puzzle.phrase.toUpperCase();
     const playerGuess = guess.toUpperCase().trim();
 
+    // Check if the guess contains punctuation
+    const hasPunctuation = /[^\w\s]/.test(playerGuess);
+    if (hasPunctuation) {
+      return NextResponse.json(
+        {
+          error: "No punctuation allowed",
+          message:
+            "⚠️ Puzzles don't use punctuation. Please enter only letters and spaces!",
+          gameState: serializeGameState(gameState),
+        },
+        { status: 400 }
+      );
+    }
+
     if (playerGuess === correctAnswer) {
       // Player wins!
       currentPlayer.score += 100;

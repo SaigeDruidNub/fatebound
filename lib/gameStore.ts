@@ -1,11 +1,14 @@
 import { MongoClient, Db, Collection } from "mongodb";
+import { LeaderboardEntry, PuzzleDifficulty } from "@/types/game";
 
 // In-memory fallback for local development without MongoDB
 const localGames = new Map<string, any>();
+const localLeaderboard: LeaderboardEntry[] = [];
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
 let gamesCollection: Collection | null = null;
+let leaderboardCollection: Collection | null = null;
 
 // Initialize MongoDB connection
 async function getMongoClient() {
@@ -14,7 +17,7 @@ async function getMongoClient() {
   }
 
   if (client && db) {
-    return { client, db, gamesCollection };
+    return { client, db, gamesCollection, leaderboardCollection };
   }
 
   try {
@@ -22,13 +25,22 @@ async function getMongoClient() {
     await client.connect();
     db = client.db("fatebound");
     gamesCollection = db.collection("games");
+    leaderboardCollection = db.collection("leaderboard");
 
     // Create index on gameId for faster lookups
     await gamesCollection.createIndex({ gameId: 1 }, { unique: true });
 
+    // Create indexes for leaderboard
+    await leaderboardCollection.createIndex(
+      { difficulty: 1, score: -1, date: -1 },
+      { name: "difficulty_score_date" }
+    );
+
     console.log("✅ Connected to MongoDB");
-    console.log(`📦 Using database: "${db.databaseName}", collection: "games"`);
-    return { client, db, gamesCollection };
+    console.log(
+      `📦 Using database: "${db.databaseName}", collections: "games", "leaderboard"`
+    );
+    return { client, db, gamesCollection, leaderboardCollection };
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
     return null;
@@ -174,4 +186,92 @@ export function generateScenario(roundNumber: number): string {
   ];
 
   return scenarios[roundNumber % scenarios.length];
+}
+
+// Leaderboard functions
+export async function saveLeaderboardEntry(entry: LeaderboardEntry) {
+  try {
+    if (isMongoConfigured()) {
+      const mongo = await getMongoClient();
+      if (mongo?.leaderboardCollection) {
+        console.log(
+          `💾 Saving leaderboard entry for ${entry.playerName} (${entry.difficulty})...`
+        );
+        await mongo.leaderboardCollection.insertOne({
+          ...entry,
+          createdAt: new Date(),
+        });
+        console.log(`✅ Leaderboard entry saved successfully to MongoDB`);
+        return;
+      }
+    }
+
+    // Fallback to in-memory storage
+    console.log(`💾 Saving leaderboard entry to local memory...`);
+    localLeaderboard.push(entry);
+    // Keep only top 100 entries in memory to prevent memory bloat
+    localLeaderboard.sort((a, b) => b.score - a.score);
+    if (localLeaderboard.length > 100) {
+      localLeaderboard.length = 100;
+    }
+    console.log(`✅ Leaderboard entry saved to memory`);
+  } catch (error) {
+    console.error("Error saving leaderboard entry:", error);
+    // Fallback to local storage on error
+    localLeaderboard.push(entry);
+  }
+}
+
+export async function getLeaderboard(
+  difficulty?: PuzzleDifficulty,
+  limit: number = 10
+): Promise<LeaderboardEntry[]> {
+  try {
+    if (isMongoConfigured()) {
+      const mongo = await getMongoClient();
+      if (mongo?.leaderboardCollection) {
+        console.log(
+          `🔍 Fetching leaderboard from MongoDB (difficulty: ${
+            difficulty || "all"
+          })...`
+        );
+        const query = difficulty ? { difficulty } : {};
+        const entries = await mongo.leaderboardCollection
+          .find(query)
+          .sort({ score: -1, date: 1 })
+          .limit(limit)
+          .toArray();
+
+        return entries.map((entry) => ({
+          playerName: entry.playerName,
+          score: entry.score,
+          difficulty: entry.difficulty,
+          date: entry.date,
+          gameId: entry.gameId,
+        }));
+      }
+    }
+
+    // Fallback to in-memory storage
+    console.log(
+      `🔍 Fetching leaderboard from local memory (difficulty: ${
+        difficulty || "all"
+      })...`
+    );
+    let filtered = difficulty
+      ? localLeaderboard.filter((e) => e.difficulty === difficulty)
+      : [...localLeaderboard];
+
+    filtered.sort((a, b) => b.score - a.score || a.date - b.date);
+    return filtered.slice(0, limit);
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error);
+    // Fallback to local storage on error
+    let filtered = difficulty
+      ? localLeaderboard.filter((e) => e.difficulty === difficulty)
+      : [...localLeaderboard];
+
+    filtered.sort((a, b) => b.score - a.score || a.date - b.date);
+    return filtered.slice(0, limit);
+  }
 }
