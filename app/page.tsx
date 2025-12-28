@@ -128,12 +128,23 @@ export default function Home() {
         body: JSON.stringify({ playerName }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Create game error:", errorData);
+        setMessage(
+          `Error creating game: ${errorData.error || "Unknown error"}`
+        );
+        return;
+      }
+
       const data = await response.json();
+      console.log("Game created:", data);
       setGameId(data.gameId);
       setPlayerId(data.playerId);
       setGameState(data.gameState);
       setMessage(`Game created! Share this code: ${data.gameId}`);
     } catch (error) {
+      console.error("Error creating game:", error);
       setMessage("Error creating game");
     } finally {
       setLoading(false);

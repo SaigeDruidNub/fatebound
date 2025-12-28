@@ -1,4 +1,44 @@
-import { kv } from "@vercel/kv";
+import { MongoClient, Db, Collection } from "mongodb";
+
+// In-memory fallback for local development without MongoDB
+const localGames = new Map<string, any>();
+
+let client: MongoClient | null = null;
+let db: Db | null = null;
+let gamesCollection: Collection | null = null;
+
+// Initialize MongoDB connection
+async function getMongoClient() {
+  if (!process.env.MONGODB_URI) {
+    return null;
+  }
+
+  if (client && db) {
+    return { client, db, gamesCollection };
+  }
+
+  try {
+    client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    db = client.db("fatebound");
+    gamesCollection = db.collection("games");
+
+    // Create index on gameId for faster lookups
+    await gamesCollection.createIndex({ gameId: 1 }, { unique: true });
+
+    console.log("✅ Connected to MongoDB");
+    console.log(`📦 Using database: "${db.databaseName}", collection: "games"`);
+    return { client, db, gamesCollection };
+  } catch (error) {
+    console.error("Failed to connect to MongoDB:", error);
+    return null;
+  }
+}
+
+// Check if MongoDB is configured
+const isMongoConfigured = () => {
+  return !!process.env.MONGODB_URI;
+};
 
 // Helper to serialize game state for storage
 function serializeForStorage(gameState: any) {
@@ -25,38 +65,82 @@ function deserializeFromStorage(gameState: any) {
 
 export async function getGame(gameId: string) {
   try {
-    console.log(`🔍 Fetching game ${gameId} from KV...`);
-    const gameState = await kv.get(`game:${gameId}`);
-    const game = deserializeFromStorage(gameState);
-    console.log(
-      `Getting game ${gameId}:`,
-      game ? "found" : "not found"
-    );
+    if (isMongoConfigured()) {
+      const mongo = await getMongoClient();
+      if (mongo?.gamesCollection) {
+        console.log(`🔍 Fetching game ${gameId} from MongoDB...`);
+        const doc = await mongo.gamesCollection.findOne({ gameId });
+        const game = doc ? deserializeFromStorage(doc.gameState) : null;
+        console.log(`Getting game ${gameId}:`, game ? "found" : "not found");
+        return game;
+      }
+    }
+
+    // Fallback to in-memory storage
+    console.log(`🔍 Fetching game ${gameId} from local memory...`);
+    const game = localGames.get(gameId);
+    console.log(`Getting game ${gameId}:`, game ? "found" : "not found");
     return game;
   } catch (error) {
     console.error(`Error fetching game ${gameId}:`, error);
-    return null;
+    // Fallback to local storage on error
+    return localGames.get(gameId) || null;
   }
 }
 
 export async function setGame(gameId: string, gameState: any) {
   try {
-    console.log(`💾 Saving game ${gameId} to KV...`);
-    const serialized = serializeForStorage(gameState);
-    await kv.set(`game:${gameId}`, serialized, { ex: 86400 }); // Expire after 24 hours
-    console.log(`✅ Game ${gameId} saved successfully`);
+    if (isMongoConfigured()) {
+      const mongo = await getMongoClient();
+      if (mongo?.gamesCollection) {
+        console.log(`💾 Saving game ${gameId} to MongoDB...`);
+        const serialized = serializeForStorage(gameState);
+        await mongo.gamesCollection.updateOne(
+          { gameId },
+          {
+            $set: {
+              gameId,
+              gameState: serialized,
+              updatedAt: new Date(),
+            },
+          },
+          { upsert: true }
+        );
+        console.log(`✅ Game ${gameId} saved successfully to MongoDB`);
+        return;
+      }
+    }
+
+    // Fallback to in-memory storage
+    console.log(`💾 Saving game ${gameId} to local memory...`);
+    localGames.set(gameId, gameState);
+    console.log(
+      `✅ Game ${gameId} saved successfully to memory (${localGames.size} total games)`
+    );
   } catch (error) {
     console.error(`Error saving game ${gameId}:`, error);
-    throw error;
+    // Fallback to local storage on error
+    localGames.set(gameId, gameState);
   }
 }
 
 export async function deleteGame(gameId: string) {
   try {
-    await kv.del(`game:${gameId}`);
-    console.log(`🗑️ Game ${gameId} deleted`);
+    if (isMongoConfigured()) {
+      const mongo = await getMongoClient();
+      if (mongo?.gamesCollection) {
+        await mongo.gamesCollection.deleteOne({ gameId });
+        console.log(`🗑️ Game ${gameId} deleted from MongoDB`);
+        return;
+      }
+    }
+
+    // Fallback to in-memory storage
+    localGames.delete(gameId);
+    console.log(`🗑️ Game ${gameId} deleted from memory`);
   } catch (error) {
     console.error(`Error deleting game ${gameId}:`, error);
+    localGames.delete(gameId);
   }
 }
 
