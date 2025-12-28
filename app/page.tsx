@@ -83,6 +83,13 @@ export default function Home() {
           });
 
           const data = await response.json();
+
+          if (data.error) {
+            console.error("Bot action error:", data.error);
+            setBotThinking(false);
+            return;
+          }
+
           setGameState(data.gameState);
 
           if (data.outcome) {
@@ -99,6 +106,8 @@ export default function Home() {
           setBotThinking(false);
         }
       }, 1500 + Math.random() * 1000); // Random delay 1.5-2.5 seconds
+
+      return; // Exit early to prevent running the auto-continue logic
     }
 
     // Auto-continue for bots after failure
@@ -112,7 +121,13 @@ export default function Home() {
         }
       }, 2000);
     }
-  }, [gameState, botThinking, loading, gameId]);
+  }, [
+    gameState?.phase,
+    gameState?.currentPlayerIndex,
+    botThinking,
+    loading,
+    gameId,
+  ]);
 
   const createGame = async () => {
     if (!playerName.trim()) {
