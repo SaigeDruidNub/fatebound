@@ -1,41 +1,136 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PuzzleDifficulty } from "@/types/game";
+
+type DifficultySettings = {
+  wordCount: string;
+  complexity: string;
+  examples: string[];
+};
+
+const DIFFICULTY_CONFIG: Record<PuzzleDifficulty, DifficultySettings> = {
+  easy: {
+    wordCount: "2 to 3 words",
+    complexity: "Simple, common words. Easy to guess.",
+    examples: ["DRAGON SLAYER", "MAGIC SWORD", "DARK FOREST", "LOST TREASURE"],
+  },
+  medium: {
+    wordCount: "3 to 4 words",
+    complexity: "Moderately challenging. Mix of common and less common words.",
+    examples: [
+      "GUARDIAN OF THE GATE",
+      "CURSE OF THE MUMMY",
+      "KEEPER OF THE FLAME",
+      "THRONE OF BONES",
+    ],
+  },
+  hard: {
+    wordCount: "4 to 5 words",
+    complexity:
+      "Challenging phrases with less common words. More abstract concepts.",
+    examples: [
+      "SHADOW OF THE FORGOTTEN REALM",
+      "WHISPERS IN THE ANCIENT VOID",
+      "CHRONICLE OF ETERNAL DARKNESS",
+      "GUARDIAN OF CELESTIAL SECRETS",
+    ],
+  },
+  "very-hard": {
+    wordCount: "5 to 6 words",
+    complexity:
+      "Very challenging. Complex phrases with uncommon words and abstract ideas.",
+    examples: [
+      "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+      "PROPHECY OF THE WANDERING SHADOW LORDS",
+      "REMNANTS OF THE CELESTIAL GUARDIAN ORDER",
+      "CHRONICLE OF THE FALLEN CRYSTAL EMPIRE",
+    ],
+  },
+};
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
+    const difficulty: PuzzleDifficulty = body.difficulty || "medium";
+    const config = DIFFICULTY_CONFIG[difficulty];
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      // Fallback puzzles with much more variety
-      const fallbackPuzzles = [
-        { phrase: "THE TREASURE IS CURSED", category: "Adventure Warning" },
-        { phrase: "BEWARE OF THE DRAGON", category: "Monster Alert" },
-        { phrase: "LOST IN THE HAUNTED FOREST", category: "Spooky Quest" },
-        { phrase: "CLIMBING THE FROZEN MOUNTAIN", category: "Epic Challenge" },
-        { phrase: "GUARDIAN OF THE ANCIENT RUINS", category: "Mythic Title" },
-        { phrase: "CROSSING THE BURNING DESERT", category: "Survival Quest" },
-        { phrase: "RIDDLE OF THE SPHINX", category: "Ancient Mystery" },
-        { phrase: "SWORD IN THE STONE", category: "Legendary Artifact" },
-        { phrase: "SHADOW OF THE TOWER", category: "Dark Location" },
-        { phrase: "WHISPERS IN THE DARK", category: "Eerie Encounter" },
-        { phrase: "CHAMPION OF THE ARENA", category: "Heroic Title" },
-        { phrase: "CURSE OF THE PHARAOH", category: "Ancient Doom" },
-        { phrase: "SWIMMING WITH SEA MONSTERS", category: "Oceanic Danger" },
-        { phrase: "KEEPER OF THE FLAME", category: "Sacred Duty" },
-        { phrase: "THRONE OF SKULLS", category: "Dark Throne" },
-      ];
-      const puzzle =
-        fallbackPuzzles[Math.floor(Math.random() * fallbackPuzzles.length)];
-      return NextResponse.json(puzzle);
+      // Fallback puzzles organized by difficulty
+      const fallbackPuzzles: Record<
+        PuzzleDifficulty,
+        Array<{ phrase: string; category: string }>
+      > = {
+        easy: [
+          { phrase: "MAGIC SWORD", category: "Legendary Weapon" },
+          { phrase: "DRAGON SLAYER", category: "Heroic Title" },
+          { phrase: "DARK FOREST", category: "Spooky Place" },
+          { phrase: "LOST TREASURE", category: "Quest Goal" },
+          { phrase: "STONE CASTLE", category: "Ancient Structure" },
+        ],
+        medium: [
+          { phrase: "THE TREASURE IS CURSED", category: "Adventure Warning" },
+          { phrase: "BEWARE OF THE DRAGON", category: "Monster Alert" },
+          { phrase: "GUARDIAN OF THE RUINS", category: "Mythic Title" },
+          { phrase: "SWORD IN THE STONE", category: "Legendary Artifact" },
+          { phrase: "CURSE OF THE PHARAOH", category: "Ancient Doom" },
+        ],
+        hard: [
+          { phrase: "SHADOW OF THE FORGOTTEN KING", category: "Dark Legacy" },
+          { phrase: "WHISPERS IN THE ANCIENT TOMB", category: "Eerie Mystery" },
+          { phrase: "KEEPER OF THE SACRED FLAME", category: "Holy Guardian" },
+          { phrase: "PROPHECY OF THE CRIMSON MOON", category: "Dark Omen" },
+          {
+            phrase: "GUARDIAN OF CELESTIAL SECRETS",
+            category: "Cosmic Keeper",
+          },
+        ],
+        "very-hard": [
+          {
+            phrase: "CHRONICLE OF THE FALLEN EMPIRE STATE",
+            category: "Ancient History",
+          },
+          {
+            phrase: "REMNANTS OF THE CELESTIAL GUARDIAN ORDER",
+            category: "Lost Organization",
+          },
+          {
+            phrase: "PROPHECY OF THE WANDERING SHADOW LORDS",
+            category: "Dark Prophecy",
+          },
+          {
+            phrase: "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+            category: "Mystic Secret",
+          },
+          {
+            phrase: "LEGEND OF THE ETERNAL TWILIGHT REALM",
+            category: "Mythic Dimension",
+          },
+        ],
+      };
+
+      const puzzles = fallbackPuzzles[difficulty];
+      const puzzle = puzzles[Math.floor(Math.random() * puzzles.length)];
+      return NextResponse.json({ ...puzzle, difficulty });
     }
+
+    const examplesText = config.examples
+      .map((ex, i) => `${i + 1}. "${ex}"`)
+      .join("\n");
 
     const systemPrompt = `Create a puzzle phrase for an adventure game like Wheel of Fortune.
 
+DIFFICULTY LEVEL: ${difficulty.toUpperCase()}
+
 REQUIREMENTS:
-- 3 to 6 words total
+- ${config.wordCount} total
+- ${config.complexity}
 - CAPITAL LETTERS ONLY (no lowercase)
 - NO punctuation, numbers, or special characters
+- NO PROPER NOUNS (no specific names of people, places, or unique entities)
 - Adventure/fantasy themed
 - Exciting and evocative
+- Use only common/generic nouns and descriptive words
 
 PHRASE TYPES (rotate through these):
 1. Action Imperatives: "CROSS THE BURNING BRIDGE"
@@ -49,25 +144,22 @@ PHRASE TYPES (rotate through these):
 9. Supernatural Phenomena: "GHOSTS OF THE MANOR"
 10. Quest Objectives: "RESCUE THE LOST PRINCE"
 
-AVOID THESE OVERUSED PHRASES:
+EXAMPLES FOR THIS DIFFICULTY:
+${examplesText}
+
+AVOID THESE:
+- Proper nouns (Zeus, Atlantis, Thor, Rome, etc.)
+- Specific character names or locations
 - "SEEK THE ANCIENT..."
 - "FIND THE LOST..."
 - "ESCAPE FROM THE..."
 - "DEFEAT THE EVIL..."
 - Generic "THE TREASURE" phrases
 
-GOOD EXAMPLES:
-- "KEEPER OF THE FLAME"
-- "SWIMMING WITH SHARKS"
-- "CURSE OF THE MUMMY"
-- "THRONE OF BONES"
-- "WHISPERS IN DARKNESS"
-- "CHAMPION OF THE PIT"
-
 Respond with ONLY this JSON (no extra text):
 { "phrase": "YOUR PHRASE", "category": "Category Name" }
 
-Make it UNIQUE and EXCITING!`;
+Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
@@ -98,13 +190,13 @@ Make it UNIQUE and EXCITING!`;
     const data = await response.json();
     const text = data.candidates[0].content.parts[0].text.trim();
 
-    // Try to parse JSON from the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const puzzle = JSON.parse(jsonMatch[0]);
       return NextResponse.json({
         phrase: puzzle.phrase.toUpperCase(),
         category: puzzle.category,
+        difficulty,
       });
     }
 
@@ -112,12 +204,14 @@ Make it UNIQUE and EXCITING!`;
     return NextResponse.json({
       phrase: "GUARDIAN OF THE RUINS",
       category: "Mythic Protector",
+      difficulty,
     });
   } catch (error) {
     console.error("Error generating puzzle:", error);
     return NextResponse.json({
       phrase: "SHADOW OF THE COLOSSUS",
       category: "Epic Encounter",
+      difficulty: "medium",
     });
   }
 }

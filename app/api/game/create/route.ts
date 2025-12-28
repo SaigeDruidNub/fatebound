@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGame, setGame } from "@/lib/gameStore";
-import { GameState, Player } from "@/types/game";
+import { GameState, Player, PuzzleDifficulty } from "@/types/game";
 
 function generateGameId(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -10,87 +10,100 @@ function generatePlayerId(): string {
   return Math.random().toString(36).substring(2, 15);
 }
 
-async function generatePuzzle() {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    const fallbackPuzzles = [
-      { phrase: "THE TREASURE IS CURSED", category: "Adventure Warning" },
-      { phrase: "BEWARE OF THE DRAGON", category: "Monster Alert" },
-      { phrase: "GUARDIAN OF THE ANCIENT RUINS", category: "Mythic Title" },
-      { phrase: "SWORD IN THE STONE", category: "Legendary Artifact" },
-      { phrase: "CURSE OF THE PHARAOH", category: "Ancient Doom" },
-    ];
-    return fallbackPuzzles[Math.floor(Math.random() * fallbackPuzzles.length)];
-  }
-
+async function generatePuzzle(difficulty: PuzzleDifficulty = "medium") {
   try {
-    const systemPrompt = `Create a puzzle phrase for an adventure game like Wheel of Fortune.
-
-REQUIREMENTS:
-- 3 to 6 words total
-- CAPITAL LETTERS ONLY (no lowercase)
-- NO punctuation, numbers, or special characters
-- Adventure/fantasy themed
-- Exciting and evocative
-
-GOOD EXAMPLES:
-- "KEEPER OF THE FLAME"
-- "CURSE OF THE MUMMY"
-- "THRONE OF BONES"
-- "CHAMPION OF THE PIT"
-
-Respond with ONLY this JSON (no extra text):
-{ "phrase": "YOUR PHRASE", "category": "Category Name" }`;
-
+    // Use the generate-puzzle API internally
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `${
+        process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+      }/api/generate-puzzle`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: systemPrompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 1.3,
-            maxOutputTokens: 100,
-            topP: 0.95,
-          },
-        }),
+        body: JSON.stringify({ difficulty }),
       }
     );
 
-    if (!response.ok) {
-      throw new Error("Gemini API failed");
+    if (response.ok) {
+      return await response.json();
     }
-
-    const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text.trim();
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const puzzle = JSON.parse(jsonMatch[0]);
-      return {
-        phrase: puzzle.phrase.toUpperCase(),
-        category: puzzle.category,
-      };
-    }
-
-    return {
-      phrase: "GUARDIAN OF THE RUINS",
-      category: "Mythic Protector",
-    };
+    throw new Error("Failed to generate puzzle");
   } catch (error) {
     console.error("Error generating puzzle:", error);
-    return {
-      phrase: "SHADOW OF THE COLOSSUS",
-      category: "Epic Encounter",
+    // Fallback puzzles organized by difficulty
+    const fallbackPuzzles: Record<
+      PuzzleDifficulty,
+      Array<{ phrase: string; category: string; difficulty: PuzzleDifficulty }>
+    > = {
+      easy: [
+        {
+          phrase: "MAGIC SWORD",
+          category: "Legendary Weapon",
+          difficulty: "easy",
+        },
+        {
+          phrase: "DRAGON SLAYER",
+          category: "Heroic Title",
+          difficulty: "easy",
+        },
+        { phrase: "DARK FOREST", category: "Spooky Place", difficulty: "easy" },
+      ],
+      medium: [
+        {
+          phrase: "THE TREASURE IS CURSED",
+          category: "Adventure Warning",
+          difficulty: "medium",
+        },
+        {
+          phrase: "GUARDIAN OF THE RUINS",
+          category: "Mythic Title",
+          difficulty: "medium",
+        },
+        {
+          phrase: "SWORD IN THE STONE",
+          category: "Legendary Artifact",
+          difficulty: "medium",
+        },
+      ],
+      hard: [
+        {
+          phrase: "SHADOW OF THE FORGOTTEN KING",
+          category: "Dark Legacy",
+          difficulty: "hard",
+        },
+        {
+          phrase: "KEEPER OF THE SACRED FLAME",
+          category: "Holy Guardian",
+          difficulty: "hard",
+        },
+        {
+          phrase: "PROPHECY OF THE CRIMSON MOON",
+          category: "Dark Omen",
+          difficulty: "hard",
+        },
+      ],
+      "very-hard": [
+        {
+          phrase: "CHRONICLE OF THE FALLEN EMPIRE STATE",
+          category: "Ancient History",
+          difficulty: "very-hard",
+        },
+        {
+          phrase: "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+          category: "Mystic Secret",
+          difficulty: "very-hard",
+        },
+        {
+          phrase: "LEGEND OF THE ETERNAL TWILIGHT REALM",
+          category: "Mythic Dimension",
+          difficulty: "very-hard",
+        },
+      ],
     };
+    const puzzles = fallbackPuzzles[difficulty];
+    return puzzles[Math.floor(Math.random() * puzzles.length)];
   }
 }
 
@@ -209,11 +222,12 @@ Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { playerName } = await request.json();
+    const body = await request.json();
+    const { playerName, difficulty = "medium" } = body;
 
     const gameId = generateGameId();
     const playerId = generatePlayerId();
-    const puzzle = await generatePuzzle();
+    const puzzle = await generatePuzzle(difficulty as PuzzleDifficulty);
     const scenario = await generateScenario();
 
     const player: Player = {
@@ -234,6 +248,7 @@ export async function POST(request: NextRequest) {
         phrase: puzzle.phrase,
         category: puzzle.category,
         revealedLetters: new Set(),
+        difficulty: puzzle.difficulty || (difficulty as PuzzleDifficulty),
       },
       currentScenario: scenario,
       scenarioHistory: [scenario],

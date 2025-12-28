@@ -14,6 +14,8 @@ export type GamePhase =
   | "waiting-continue"
   | "game-over";
 
+export type PuzzleDifficulty = "easy" | "medium" | "hard" | "very-hard";
+
 export interface GameState {
   id: string;
   players: Player[];
@@ -23,6 +25,7 @@ export interface GameState {
     phrase: string;
     category: string;
     revealedLetters: Set<string>;
+    difficulty: PuzzleDifficulty;
   };
   currentScenario: string;
   scenarioHistory: string[];

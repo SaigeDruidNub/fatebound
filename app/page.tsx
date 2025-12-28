@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Player, GamePhase } from "@/types/game";
+import { Player, GamePhase, PuzzleDifficulty } from "@/types/game";
 
 type GameState = {
   id: string;
@@ -13,6 +13,7 @@ type GameState = {
     phrase: string;
     category: string;
     revealedLetters: string[];
+    difficulty: PuzzleDifficulty;
   };
   currentScenario: string;
   roundNumber: number;
@@ -32,6 +33,8 @@ export default function Home() {
   const [lastOutcome, setLastOutcome] = useState("");
   const [botThinking, setBotThinking] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [puzzleDifficulty, setPuzzleDifficulty] =
+    useState<PuzzleDifficulty>("medium");
   const botActionInProgress = useRef(false);
 
   // Sync gameId from gameState if needed
@@ -202,7 +205,7 @@ export default function Home() {
       const response = await fetch("/api/game/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerName }),
+        body: JSON.stringify({ playerName, difficulty: puzzleDifficulty }),
       });
 
       if (!response.ok) {
@@ -597,6 +600,41 @@ export default function Home() {
                 />
               </div>
 
+              <div>
+                <label className="block text-white mb-2">
+                  Puzzle Difficulty:
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {["easy", "medium", "hard", "very-hard"].map((diff) => (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() =>
+                        setPuzzleDifficulty(diff as PuzzleDifficulty)
+                      }
+                      className={`rounded-lg px-4 py-3 font-semibold text-white transition-colors ${
+                        puzzleDifficulty === diff
+                          ? "bg-[#B06821] ring-2 ring-[#B06821]"
+                          : "bg-[#305853] hover:bg-[#B06821]/50"
+                      }`}
+                    >
+                      {diff === "very-hard"
+                        ? "Very Hard"
+                        : diff.charAt(0).toUpperCase() + diff.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[#305853] mt-2">
+                  {puzzleDifficulty === "easy" && "2-3 words • Simple phrases"}
+                  {puzzleDifficulty === "medium" &&
+                    "3-4 words • Moderate challenge"}
+                  {puzzleDifficulty === "hard" &&
+                    "4-5 words • Challenging phrases"}
+                  {puzzleDifficulty === "very-hard" &&
+                    "5-6 words • Very challenging"}
+                </p>
+              </div>
+
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   onClick={createGame}
@@ -672,6 +710,21 @@ export default function Home() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="bg-[#305853]/40 p-4 rounded border border-[#305853]">
+                <div className="flex items-center justify-between">
+                  <span className="text-white font-semibold">
+                    Puzzle Difficulty:
+                  </span>
+                  <span className="text-[#B06821] font-bold capitalize">
+                    {gameState.puzzle?.difficulty
+                      ? gameState.puzzle.difficulty === "very-hard"
+                        ? "Very Hard"
+                        : gameState.puzzle.difficulty
+                      : "Medium"}
+                  </span>
                 </div>
               </div>
 
