@@ -18,7 +18,7 @@ export interface GameState {
   id: string;
   players: Player[];
   currentPlayerIndex: number;
-  phase: "lobby" | "playing" | "finished";
+  phase: GamePhase;
   puzzle: {
     phrase: string;
     category: string;
