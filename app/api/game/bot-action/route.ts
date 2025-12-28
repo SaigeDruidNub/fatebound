@@ -25,26 +25,25 @@ function isValidAction(text: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: "Missing GEMINI_API_KEY" },
-        { status: 500 }
-      );
-    }
-
     const { gameId } = await req.json();
 
     if (!gameId) {
+      console.error("Bot action: Missing gameId");
       return NextResponse.json({ error: "Missing gameId" }, { status: 400 });
     }
 
     const gameState = await getGame(gameId);
     if (!gameState) {
+      console.error("Bot action: Game not found", gameId);
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
     if (!currentPlayer || !currentPlayer.isBot) {
+      console.error(
+        "Bot action: Current player is not a bot",
+        currentPlayer?.name
+      );
       return NextResponse.json(
         { error: "Current player is not a bot" },
         { status: 400 }
@@ -61,19 +60,21 @@ export async function POST(req: NextRequest) {
         ? "cautious but determined"
         : "desperate and reckless";
 
-    // Gemini model name: adjust to whatever you're actually using in your project
-    // Common preview IDs include: "gemini-1.5-pro" or preview variants.
-    // If you already know the exact one, swap it here.
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro", // <-- change to your exact "Gemini Pro Preview" model id if different
-      generationConfig: {
-        temperature: 1.0, // higher => more variety
-        topP: 0.9,
-        maxOutputTokens: 60,
-      },
-    });
+    let cleaned = "";
 
-    const system = `
+    // Try to generate bot action with AI
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: "gemini-1.5-pro",
+          generationConfig: {
+            temperature: 1.0,
+            topP: 0.9,
+            maxOutputTokens: 60,
+          },
+        });
+
+        const system = `
 You write ONE first-person action a bot takes in an adventure game.
 Rules:
 - Output ONE sentence.
@@ -84,7 +85,7 @@ Rules:
 - No meta commentary.
 `.trim();
 
-    const user = `
+        const user = `
 Bot: ${botName}
 Lives: ${lives}
 Personality: ${personality}
@@ -93,12 +94,33 @@ Scenario: ${scenario}
 Write the bot's action:
 `.trim();
 
-    const result = await model.generateContent([system, user]);
-    const raw = result.response.text() || "";
-    const cleaned = cleanAction(raw);
+        const result = await model.generateContent([system, user]);
+        const raw = result.response.text() || "";
+        cleaned = cleanAction(raw);
 
-    if (!isValidAction(cleaned)) {
-      return NextResponse.json({ error: "Invalid AI action" }, { status: 400 });
+        if (!isValidAction(cleaned)) {
+          throw new Error("Invalid AI action generated");
+        }
+      } catch (aiError) {
+        console.error("Failed to generate bot action with AI:", aiError);
+        // Fall through to use fallback
+      }
+    }
+
+    // Fallback bot actions if AI fails
+    if (!cleaned) {
+      const fallbackActions = [
+        "I carefully examine my surroundings for any hidden dangers before proceeding cautiously forward.",
+        "I draw my weapon and prepare to defend myself while looking for an escape route.",
+        "I attempt to negotiate peacefully while keeping my guard up and watching for threats.",
+        "I search for an alternative path that might be safer than the obvious route ahead.",
+        "I use my supplies to create a distraction and slip away from the immediate danger.",
+        "I observe the situation from a safe distance to better understand what I'm dealing with.",
+        "I trust my instincts and make a quick decisive move to get past this obstacle.",
+        "I call out to see if there's anyone or anything that might respond before acting.",
+      ];
+      cleaned =
+        fallbackActions[Math.floor(Math.random() * fallbackActions.length)];
     }
 
     // Now evaluate the bot's action
@@ -132,10 +154,12 @@ Write the bot's action:
       outcome,
       botAction: cleaned,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("Gemini bot-action error:", e);
+    console.error("Error stack:", e?.stack);
+    console.error("Error message:", e?.message);
     return NextResponse.json(
-      { error: "AI generation failed" },
+      { error: e?.message || "AI generation failed" },
       { status: 500 }
     );
   }
