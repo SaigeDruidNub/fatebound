@@ -14,21 +14,22 @@ export type GamePhase =
   | "waiting-continue"
   | "game-over";
 
-export type GameState = {
+export interface GameState {
   id: string;
   players: Player[];
   currentPlayerIndex: number;
-  phase: GamePhase;
+  phase: "lobby" | "playing" | "finished";
   puzzle: {
     phrase: string;
     category: string;
     revealedLetters: Set<string>;
   };
   currentScenario: string;
+  scenarioHistory: string[];
   roundNumber: number;
   winner: string | null;
   createdAt: number;
-};
+}
 
 export type ActionResult = {
   success: boolean;

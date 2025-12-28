@@ -5,37 +5,69 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      // Fallback puzzles
+      // Fallback puzzles with much more variety
       const fallbackPuzzles = [
         { phrase: "THE TREASURE IS CURSED", category: "Adventure Warning" },
-        { phrase: "ESCAPE FROM THE DUNGEON", category: "Classic Quest" },
         { phrase: "BEWARE OF THE DRAGON", category: "Monster Alert" },
+        { phrase: "LOST IN THE HAUNTED FOREST", category: "Spooky Quest" },
+        { phrase: "CLIMBING THE FROZEN MOUNTAIN", category: "Epic Challenge" },
+        { phrase: "GUARDIAN OF THE ANCIENT RUINS", category: "Mythic Title" },
+        { phrase: "CROSSING THE BURNING DESERT", category: "Survival Quest" },
+        { phrase: "RIDDLE OF THE SPHINX", category: "Ancient Mystery" },
+        { phrase: "SWORD IN THE STONE", category: "Legendary Artifact" },
+        { phrase: "SHADOW OF THE TOWER", category: "Dark Location" },
+        { phrase: "WHISPERS IN THE DARK", category: "Eerie Encounter" },
+        { phrase: "CHAMPION OF THE ARENA", category: "Heroic Title" },
+        { phrase: "CURSE OF THE PHARAOH", category: "Ancient Doom" },
+        { phrase: "SWIMMING WITH SEA MONSTERS", category: "Oceanic Danger" },
+        { phrase: "KEEPER OF THE FLAME", category: "Sacred Duty" },
+        { phrase: "THRONE OF SKULLS", category: "Dark Throne" },
       ];
       const puzzle =
         fallbackPuzzles[Math.floor(Math.random() * fallbackPuzzles.length)];
       return NextResponse.json(puzzle);
     }
 
-    const systemPrompt = `You are creating puzzles for an adventure game similar to Wheel of Fortune.
-Generate a puzzle phrase related to adventures, quests, dungeons, fantasy, or heroic themes.
+    const systemPrompt = `Create a puzzle phrase for an adventure game like Wheel of Fortune.
 
-Rules:
-- Phrase must be 3–6 words
-- Use ONLY capital letters and spaces
-- No punctuation or numbers
-- Phrase should be exciting and evocative
-- Do NOT always start with a verb
-- Avoid overused verbs like FIND ESCAPE BATTLE
+REQUIREMENTS:
+- 3 to 6 words total
+- CAPITAL LETTERS ONLY (no lowercase)
+- NO punctuation, numbers, or special characters
+- Adventure/fantasy themed
+- Exciting and evocative
 
-Choose ONE phrase style:
-- Imperative action
-- Descriptive location
-- Dramatic situation
-- Hero identity or title
-- Legendary object or artifact
-- Mythic event or prophecy
-- Respond ONLY with a JSON object: { "phrase": "YOUR PHRASE HERE", "category": "Category Name" }
-- Categories must match the chosen phrase style and be adventure-themed.`;
+PHRASE TYPES (rotate through these):
+1. Action Imperatives: "CROSS THE BURNING BRIDGE"
+2. Dangerous Locations: "DEPTHS OF THE ABYSS"
+3. Mythic Creatures: "GUARDIAN OF THE GATE"
+4. Legendary Objects: "CROWN OF THE FORGOTTEN KING"
+5. Heroic Titles: "SLAYER OF SHADOW BEASTS"
+6. Dramatic Warnings: "BEWARE THE CRIMSON MOON"
+7. Ancient Mysteries: "RIDDLE OF THE STONES"
+8. Epic Events: "BATTLE FOR THE REALM"
+9. Supernatural Phenomena: "GHOSTS OF THE MANOR"
+10. Quest Objectives: "RESCUE THE LOST PRINCE"
+
+AVOID THESE OVERUSED PHRASES:
+- "SEEK THE ANCIENT..."
+- "FIND THE LOST..."
+- "ESCAPE FROM THE..."
+- "DEFEAT THE EVIL..."
+- Generic "THE TREASURE" phrases
+
+GOOD EXAMPLES:
+- "KEEPER OF THE FLAME"
+- "SWIMMING WITH SHARKS"
+- "CURSE OF THE MUMMY"
+- "THRONE OF BONES"
+- "WHISPERS IN DARKNESS"
+- "CHAMPION OF THE PIT"
+
+Respond with ONLY this JSON (no extra text):
+{ "phrase": "YOUR PHRASE", "category": "Category Name" }
+
+Make it UNIQUE and EXCITING!`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
@@ -51,8 +83,9 @@ Choose ONE phrase style:
             },
           ],
           generationConfig: {
-            temperature: 1.0,
+            temperature: 1.3,
             maxOutputTokens: 100,
+            topP: 0.95,
           },
         }),
       }
@@ -77,14 +110,14 @@ Choose ONE phrase style:
 
     // Fallback
     return NextResponse.json({
-      phrase: "SEEK THE ANCIENT ARTIFACT",
-      category: "Epic Quest",
+      phrase: "GUARDIAN OF THE RUINS",
+      category: "Mythic Protector",
     });
   } catch (error) {
     console.error("Error generating puzzle:", error);
     return NextResponse.json({
-      phrase: "DISCOVER THE LOST TEMPLE",
-      category: "Adventure Quest",
+      phrase: "SHADOW OF THE COLOSSUS",
+      category: "Epic Encounter",
     });
   }
 }

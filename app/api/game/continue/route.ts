@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGame, setGame } from "@/lib/gameStore";
 
-async function generateScenario() {
+async function generateScenario(recentScenarios: string[] = []) {
   try {
     const response = await fetch(
       `${
         process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
       }/api/generate-scenario`,
-      { method: "POST" }
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recentScenarios }),
+      }
     );
     const data = await response.json();
     return data.scenario;
@@ -53,8 +57,19 @@ export async function POST(request: NextRequest) {
       gameState.phase = "playing";
       gameState.roundNumber++;
 
+      // Track recent scenarios (keep last 5)
+      if (!gameState.scenarioHistory) {
+        gameState.scenarioHistory = [];
+      }
+      gameState.scenarioHistory.push(gameState.currentScenario);
+      if (gameState.scenarioHistory.length > 5) {
+        gameState.scenarioHistory.shift();
+      }
+
       // Generate new scenario
-      gameState.currentScenario = await generateScenario();
+      gameState.currentScenario = await generateScenario(
+        gameState.scenarioHistory
+      );
     }
 
     await setGame(gameId, gameState);

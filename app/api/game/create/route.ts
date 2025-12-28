@@ -20,17 +20,21 @@ async function generatePuzzle() {
     );
     return await response.json();
   } catch (error) {
-    return { phrase: "SEEK THE ANCIENT ARTIFACT", category: "Epic Quest" };
+    return { phrase: "CURSE OF THE TOMB", category: "Ancient Mystery" };
   }
 }
 
-async function generateScenario() {
+async function generateScenario(recentScenarios: string[] = []) {
   try {
     const response = await fetch(
       `${
         process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
       }/api/generate-scenario`,
-      { method: "POST" }
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recentScenarios }),
+      }
     );
     const data = await response.json();
     return data.scenario;
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
         revealedLetters: new Set(),
       },
       currentScenario: scenario,
+      scenarioHistory: [scenario],
       roundNumber: 1,
       winner: null,
       createdAt: Date.now(),
