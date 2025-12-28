@@ -89,20 +89,29 @@ async function evaluateAction(
   }
 
   try {
-    const systemPrompt = `You are judging a player's action in an adventure game. The player must survive challenges.
+    const systemPrompt = `You are a fair dungeon master judging player actions in an adventure game.
 
-Rules:
-- Evaluate if their action is smart, cautious, and likely to succeed
-- Be fair but challenging - clever actions should succeed, reckless ones should fail
-- Consider creativity and caution
-- Respond with a JSON object: { "success": true/false, "outcome": "description of what happens" }
-- Keep outcome concise (2-3 sentences)
-- Make it dramatic and engaging`;
+EVALUATION CRITERIA:
+- Smart, cautious actions that assess risk = SUCCESS
+- Creative solutions that address the problem = SUCCESS  
+- Reckless actions without thought = FAILURE
+- Actions that ignore obvious dangers = FAILURE
+- Moderate risk with preparation = 60% chance SUCCESS
 
-    const userPrompt = `Scenario: ${scenario}
-Player's action: ${action}
+RESPONSE FORMAT:
+{ "success": true/false, "outcome": "2-3 sentence dramatic description" }
 
-Judge if they succeed or fail. Be fair but challenging.`;
+Be FAIR: Don't punish reasonable actions. Reward clever thinking.
+Be ENGAGING: Make outcomes exciting and specific to their action.
+Be CONSISTENT: Similar actions should get similar results.`;
+
+    const userPrompt = `SCENARIO: ${scenario}
+
+PLAYER ACTION: "${action}"
+
+Does this action succeed? Consider: Is it thoughtful? Does it address the danger? Is it reckless?
+
+Respond ONLY with valid JSON.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,

@@ -19,35 +19,37 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const systemPrompt = `You are creating adventure challenges for a game.
-Generate a dangerous, exciting scenario that the player must overcome.
+    const systemPrompt = `Create a dramatic adventure challenge for a game (2-3 sentences max).
 
-Rules:
-- Keep it 1–3 sentences
-- Make it dramatic and engaging
-- End with "What do you do?"
-- Present danger that requires a decision, not just a reflex
-- Include at least one obstacle AND one meaningful choice
+REQUIREMENTS:
+✓ Present a clear danger or obstacle
+✓ Give players a meaningful choice
+✓ End with "What do you do?"
+✓ Be specific and vivid (not generic)
+✓ Create tension and urgency
 
-Constraints:
-- Do NOT use falling bridges, collapsing floors, or bottomless pits
-- Avoid gravity-only hazards
-- Avoid repeating common fantasy tropes
-- Make each scenario feel distinct
+AVOID:
+✗ Falling/collapsing floors or bridges
+✗ Bottomless pits or falling hazards  
+✗ Overused fantasy clichés
+✗ Vague descriptions
 
-Choose ONE primary danger type:
-- Intelligent enemy or ambush
-- Environmental hazard (fire, ice, poison, storm, darkness)
-- Moral dilemma or hostage situation
-- Time pressure or countdown
-- Equipment failure or limited resources
-- Psychological or sensory distortion
+DANGER TYPES (pick one):
+• Enemy/creature encounter (blocking path, hunting, guarding)
+• Environmental threat (fire, poison, water, darkness, thorns)
+• Moral choice (save someone, sacrifice, betray)
+• Resource crisis (low supplies, time limit, broken equipment)
+• Mystery/puzzle (trapped, cursed object, riddle door)
+• Social encounter (hostile guards, suspicious NPC, negotiation)
 
-Examples of strong scenarios:
-- "Your torch sputters out as whispers begin answering your thoughts, offering guidance at a price. Footsteps close in from behind. What do you do?"
-- "A wounded enemy blocks the only exit while the chamber fills with toxic gas, and they beg for help. What do you do?"
+EXAMPLES:
+"Three guards approach, swords drawn. One whispers 'Run now, or they'll see you too.' The others are seconds away. What do you do?"
 
-Respond ONLY with the scenario text, nothing else.`;
+"The ancient tree's roots writhe, pulling your companion underground. You hear muffled screams as vines wrap around your legs. What do you do?"
+
+"Your map dissolves in your hands - it was cursed. Behind you, the maze walls shift and grind, sealing the path you came from. What do you do?"
+
+Write ONE new scenario (different from examples):`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
