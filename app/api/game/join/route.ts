@@ -10,13 +10,19 @@ export async function POST(request: NextRequest) {
   try {
     const { gameId, playerName } = await request.json();
 
+    console.log(`🎮 Attempting to join game: ${gameId}, player: ${playerName}`);
+
     const gameState = getGame(gameId);
 
     if (!gameState) {
+      console.error(`❌ Game ${gameId} not found`);
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
     if (gameState.phase !== "lobby") {
+      console.error(
+        `❌ Game ${gameId} already started (phase: ${gameState.phase})`
+      );
       return NextResponse.json(
         { error: "Game already started" },
         { status: 400 }
@@ -35,6 +41,8 @@ export async function POST(request: NextRequest) {
 
     gameState.players.push(player);
     setGame(gameId, gameState);
+
+    console.log(`✅ Player ${playerName} joined game ${gameId}`);
 
     return NextResponse.json({
       playerId,

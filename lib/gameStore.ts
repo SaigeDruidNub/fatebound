@@ -48,13 +48,16 @@ function saveGamesToFile() {
 loadGamesFromFile();
 
 export function getGame(gameId: string) {
-  const game = games.get(gameId);
-  if (!game && games.size === 0) {
+  let game = games.get(gameId);
+
+  // If game not found, try reloading from file (in case of HMR or server restart)
+  if (!game) {
     console.warn(
-      "⚠️ Games map is empty - attempting to reload from storage..."
+      `⚠️ Game ${gameId} not found in memory (${games.size} games loaded) - attempting to reload from storage...`
     );
+    gamesLoaded = false; // Reset flag to allow reload
     loadGamesFromFile();
-    return games.get(gameId);
+    game = games.get(gameId);
   }
 
   // Convert revealedLetters array back to Set if needed (from JSON deserialization)
