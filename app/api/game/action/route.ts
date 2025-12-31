@@ -6,12 +6,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { gameId, playerId, action } = body;
 
-    console.log("Action request:", {
-      gameId,
-      playerId,
-      actionLength: action?.length,
-    });
-
     if (!gameId || !playerId || !action) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -100,75 +94,108 @@ async function evaluateAction(
   scenario: string
 ): Promise<{ success: boolean; outcome: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return evaluateActionFallback(action);
 
-  if (!apiKey) {
-    // Fallback logic
-    return evaluateActionFallback(action);
+  const model = "gemini-3-flash-preview";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  const systemInstruction = `
+You are a fair dungeon master judging a player action.
+
+Return ONLY a JSON object matching the provided schema.
+No markdown. No preface. No extra keys.
+Outcome must be 2 sentences and specific to the scenario + action.
+Smart/cautious/creative = success. Reckless/ignoring danger = failure.
+`.trim();
+
+  const responseSchema = {
+    type: "OBJECT",
+    properties: {
+      success: { type: "BOOLEAN" },
+      outcome: { type: "STRING" },
+    },
+    required: ["success", "outcome"],
+  } as const;
+
+  function validate(obj: any): obj is { success: boolean; outcome: string } {
+    return (
+      obj &&
+      typeof obj.success === "boolean" &&
+      typeof obj.outcome === "string" &&
+      obj.outcome.trim().length > 0
+    );
   }
 
-  try {
-    const systemPrompt = `You are a fair dungeon master judging player actions in an adventure game.
-
-EVALUATION CRITERIA:
-- Smart, cautious actions that assess risk = SUCCESS
-- Creative solutions that address the problem = SUCCESS  
-- Reckless actions without thought = FAILURE
-- Actions that ignore obvious dangers = FAILURE
-- Moderate risk with preparation = 60% chance SUCCESS
-
-RESPONSE FORMAT:
-{ "success": true/false, "outcome": "2-3 sentence dramatic description" }
-
-Be FAIR: Don't punish reasonable actions. Reward clever thinking.
-Be ENGAGING: Make outcomes exciting and specific to their action.
-Be CONSISTENT: Similar actions should get similar results.`;
-
-    const userPrompt = `SCENARIO: ${scenario}
-
-PLAYER ACTION: "${action}"
-
-Does this action succeed? Consider: Is it thoughtful? Does it address the danger? Is it reckless?
-
-Respond ONLY with valid JSON.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+  async function callGemini(promptText: string, retry: boolean) {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey || "",
+      } as HeadersInit,
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ role: "user", parts: [{ text: promptText }] }],
+        generationConfig: {
+          temperature: retry ? 0.2 : 0.4,
+          maxOutputTokens: 220,
+          responseMimeType: "application/json",
+          // KEY: schema-constrained output
+          responseSchema,
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 200,
-          },
-        }),
-      }
-    );
+      }),
+    });
 
-    if (!response.ok) {
-      return evaluateActionFallback(action);
+    if (!resp.ok) return { ok: false as const, text: "", raw: null };
+
+    const raw = await resp.json();
+    const text = raw?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    // Log useful debugging signals (why truncation happens)
+    // (Finish reason is often "MAX_TOKENS" / "SAFETY" / "STOP" etc.)
+    const finishReason = raw?.candidates?.[0]?.finishReason;
+    if (finishReason)
+      console.warn("[evaluateAction] finishReason:", finishReason);
+
+    return { ok: true as const, text: String(text).trim(), raw };
+  }
+
+  const basePrompt = `SCENARIO: ${scenario}\nACTION: "${action}"`;
+
+  // Attempt 1
+  try {
+    const r1 = await callGemini(basePrompt, false);
+    if (r1.ok) {
+      // With responseMimeType+schema, many responses are directly parseable JSON
+      try {
+        const obj = JSON.parse(r1.text);
+        if (validate(obj))
+          return { success: obj.success, outcome: obj.outcome.trim() };
+      } catch {
+        // Fall through to attempt 2
+        console.warn("⚠️ Attempt 1 not parseable:", r1.text);
+      }
     }
 
-    const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text.trim();
+    // Attempt 2: repair prompt (handles “{” or “Here is …”)
+    const repairPrompt =
+      basePrompt +
+      `\n\nYour previous output was invalid. Return ONLY the JSON object matching the schema.`;
 
-    // Try to parse JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      return result;
+    const r2 = await callGemini(repairPrompt, true);
+    if (r2.ok) {
+      try {
+        const obj = JSON.parse(r2.text);
+        if (validate(obj))
+          return { success: obj.success, outcome: obj.outcome.trim() };
+      } catch {
+        console.warn("⚠️ Attempt 2 not parseable:", r2.text);
+      }
     }
 
     return evaluateActionFallback(action);
-  } catch (error) {
-    console.error("AI evaluation error:", error);
+  } catch (err) {
+    console.error("❌ AI evaluation error:", err);
     return evaluateActionFallback(action);
   }
 }

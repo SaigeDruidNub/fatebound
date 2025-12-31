@@ -1,26 +1,309 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getGame, setGame } from "@/lib/gameStore";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+function getScenarioText(gameState: any): string {
+  const s = gameState?.currentScenario;
+  if (typeof s === "string") return s.trim();
+
+  const text =
+    s?.text ??
+    s?.prompt ??
+    s?.description ??
+    gameState?.scenario ??
+    gameState?.lastScenario ??
+    "";
+
+  return typeof text === "string" ? text.trim() : "";
+}
 
 function cleanAction(text: string) {
-  // Keep it readable + safe for your game log
-  // Allow common punctuation; remove anything weird
-  return text
+  return (text || "")
+    .replace(/[\r\n]+/g, " ")
     .replace(/[^\w\s'.,!-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+function wordCount(s: string) {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function isValidAction(text: string) {
   const len = text.length;
-  if (len < 20 || len > 140) return false; // keep it tight
-  // avoid meta/system leakage
+  if (len < 20 || len > 200) return false;
+
   const banned = ["as an ai", "i cannot", "system prompt", "json", "model"];
   const lower = text.toLowerCase();
   if (banned.some((b) => lower.includes(b))) return false;
+
   return true;
+}
+
+function isValidBotSentence(text: string) {
+  if (!text) return false;
+  if (!text.startsWith("I ")) return false;
+
+  const wc = wordCount(text);
+  if (wc < 12 || wc > 22) return false;
+
+  return isValidAction(text);
+}
+
+function extractActionLine(raw: string): string {
+  const text = (raw || "").trim();
+  const idx = text.toUpperCase().indexOf("ACTION:");
+  if (idx === -1) return "";
+
+  const line = text.slice(idx).split("\n")[0].trim();
+  const after = line.slice("ACTION:".length).trim();
+  return cleanAction(after);
+}
+
+/**
+ * More robust parsing for your consistent template:
+ * "... You can <A>, ... or <B>, ... What do you do?"
+ */
+function parseScenarioOptions(
+  scenario: string
+): { optionA: string; optionB: string } | null {
+  const s = (scenario || "").replace(/\s+/g, " ").trim();
+
+  // Non-greedy capture up to the first comma after "You can ..."
+  // then capture after "or" up to the next comma or "What do you do?"
+  const m = s.match(/\bYou can\s+(.*?)(?:,|\s)\s+or\s+(.*?)(?:,|\s+What do you do\?)/i);
+
+  if (!m) return null;
+
+  const optionA = cleanAction(m[1] ?? "");
+  const optionB = cleanAction(m[2] ?? "");
+
+  if (!optionA || !optionB) return null;
+
+  return { optionA, optionB };
+}
+
+/**
+ * Grab a couple of quoted anchor terms like "Void-Dagger" or "Shadow-Scribe"
+ * to keep generic expansions scenario-relevant even if parsing fails.
+ */
+function extractScenarioAnchors(scenario: string): string[] {
+  const matches = Array.from((scenario || "").matchAll(/"([^"]+)"/g))
+    .map((m) => m[1])
+    .filter(Boolean);
+
+  // prefer unique, first few
+  const uniq: string[] = [];
+  for (const x of matches) {
+    if (!uniq.includes(x)) uniq.push(x);
+    if (uniq.length >= 3) break;
+  }
+  return uniq;
+}
+
+/**
+ * Choose which option to commit to, using the fragment and/or lives/personality.
+ */
+function chooseOption(
+  fragment: string,
+  options: { optionA: string; optionB: string },
+  lives: number,
+  personality: string
+): "A" | "B" {
+  const frag = fragment.toLowerCase();
+
+  // Try to match fragment words to one of the options
+  const a = options.optionA.toLowerCase();
+  const b = options.optionB.toLowerCase();
+
+  const fragTokens = frag.split(/\s+/).filter(Boolean);
+  const score = (text: string) =>
+    fragTokens.reduce((acc, t) => (t.length >= 4 && text.includes(t) ? acc + 1 : acc), 0);
+
+  const scoreA = score(a);
+  const scoreB = score(b);
+
+  if (scoreA > scoreB) return "A";
+  if (scoreB > scoreA) return "B";
+
+  // If still tied, pick based on risk tolerance:
+  // - low lives or "cautious" => safer / preserve life (often the sacrifice option)
+  // - high lives or "bold" => take active/heroic option
+  const cautious = personality.includes("cautious") || lives <= 2;
+  return cautious ? "A" : "B";
+}
+
+/**
+ * Turn an option like "slice your shadows free with a Void-Dagger"
+ * into a present-tense clause: "slice my shadows free with the Void-Dagger"
+ */
+function toFirstPersonPresent(option: string) {
+  let o = option.trim();
+
+  // simple pronoun swaps
+  o = o.replace(/\byour\b/gi, "my");
+  o = o.replace(/\byourself\b/gi, "myself");
+  o = o.replace(/\byours\b/gi, "mine");
+  o = o.replace(/\byou\b/gi, "I"); // last resort
+
+  // Ensure it starts with a verb phrase, not "I"
+  o = o.replace(/^I\s+/i, "");
+
+  return o;
+}
+
+/**
+ * Expand short / truncated Gemini output into a complete 12–22 word sentence,
+ * using the actual scenario options (no hard-coded bomb text).
+ */
+function expandFragmentAction(params: {
+  fragment: string;
+  scenario: string;
+  personality: string;
+  lives: number;
+}): string {
+  let frag = cleanAction(params.fragment);
+
+  // normalize "I will X" => "I X"
+  frag = frag.replace(/^I will\s+/i, "I ").trim();
+
+  if (!frag.startsWith("I ")) return "";
+
+  // If already valid-length, return as-is (still must pass validator later)
+  const wc = wordCount(frag);
+  if (wc >= 12 && wc <= 22) return frag;
+
+  const opts = parseScenarioOptions(params.scenario);
+
+  const style =
+    params.personality.includes("desperate")
+      ? "without hesitation"
+      : params.personality.includes("cautious")
+      ? "carefully controlling my breath"
+      : "with grim resolve";
+
+  if (opts) {
+    const pick = chooseOption(frag, opts, params.lives, params.personality);
+    const chosen = pick === "A" ? opts.optionA : opts.optionB;
+
+    const clause = toFirstPersonPresent(chosen);
+
+    // Build sentence; keep within 12–22 words by trimming variants.
+    let sentence = cleanAction(`I ${clause}, ${style}, before the danger tightens around us.`);
+    if (wordCount(sentence) > 22) {
+      sentence = cleanAction(`I ${clause}, ${style}, before it is too late.`);
+    }
+    if (wordCount(sentence) > 22) {
+      sentence = cleanAction(`I ${clause}, ${style}, to keep us alive.`);
+    }
+    if (wordCount(sentence) < 12) {
+      sentence = cleanAction(`I ${clause}, ${style}, to keep my party alive.`);
+    }
+    return sentence;
+  }
+
+  // If parsing fails, create a scenario-anchored generic action
+  const anchors = extractScenarioAnchors(params.scenario);
+  const anchorText = anchors.length ? `against the ${anchors[0]}` : "against the threat";
+
+  let sentence = cleanAction(`I steady myself, ${style}, and act decisively ${anchorText} before time runs out.`);
+  if (wordCount(sentence) > 22) {
+    sentence = cleanAction(`I steady myself, ${style}, and act decisively ${anchorText} before it is too late.`);
+  }
+  if (wordCount(sentence) < 12) {
+    sentence = cleanAction(`I steady myself ${style} and act decisively ${anchorText} before it is too late.`);
+  }
+  return sentence;
+}
+
+async function generateBotActionWithGemini3(params: {
+  botName: string;
+  lives: number;
+  personality: string;
+  scenario: string;
+}): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return "";
+
+  const { botName, lives, personality, scenario } = params;
+  const modelName = "gemini-3-flash-preview";
+
+  const systemInstruction = `
+You are writing a bot action for a fantasy adventure game.
+
+Output rules (MUST follow):
+- Output EXACTLY ONE line.
+- That line MUST start with: ACTION:
+- After ACTION:, write ONE complete first-person sentence.
+- 12 to 22 words.
+- Must start with "I" after the prefix.
+- Must commit to one of the scenario options.
+- No extra text before or after.
+`.trim();
+
+  const baseUser = `
+Bot: ${botName}
+Lives: ${lives}
+Personality: ${personality}
+Scenario: ${scenario}
+
+Return only the ACTION line.
+`.trim();
+
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const userText =
+      attempt === 1
+        ? baseUser
+        : baseUser +
+          `\nINVALID OUTPUT. Output ONLY one line starting with ACTION: followed by a FULL 12-22 word sentence.`;
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ role: "user", parts: [{ text: userText }] }],
+          generationConfig: {
+            temperature: 0.25,
+            topP: 0.9,
+            maxOutputTokens: 140,
+          },
+        }),
+      }
+    );
+
+    if (!resp.ok) {
+      console.error("[BotAction] Gemini REST non-OK:", resp.status);
+      continue;
+    }
+
+    const data = await resp.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    console.log(`[BotAction] Raw AI output (attempt ${attempt}):`, raw);
+
+    let candidate = extractActionLine(raw);
+    console.log(
+      `[BotAction] Extracted+Cleaned AI action (attempt ${attempt}):`,
+      candidate
+    );
+
+    // Expand fragments using scenario-derived options (not hard-coded)
+    if (candidate && wordCount(candidate) < 12) {
+      const expanded = expandFragmentAction({
+        fragment: candidate,
+        scenario,
+        personality,
+        lives,
+      });
+      console.log(`[BotAction] Expanded fragment (attempt ${attempt}):`, expanded);
+      candidate = expanded;
+    }
+
+    if (isValidBotSentence(candidate)) return candidate;
+  }
+
+  return "";
 }
 
 export async function POST(req: NextRequest) {
@@ -52,7 +335,10 @@ export async function POST(req: NextRequest) {
 
     const botName = currentPlayer.name;
     const lives = currentPlayer.lives;
-    const scenario = gameState.currentScenario;
+    const scenario = getScenarioText(gameState);
+
+    console.log("[BotAction] scenario:", scenario);
+
     const personality =
       lives > 2
         ? "brave and bold"
@@ -60,81 +346,36 @@ export async function POST(req: NextRequest) {
         ? "cautious but determined"
         : "desperate and reckless";
 
-    let cleaned = "";
+    let actionText = "";
 
-    // Try to generate bot action with AI
     if (process.env.GEMINI_API_KEY) {
-      try {
-        const model = genAI.getGenerativeModel({
-          model: "gemini-3-pro-preview",
-          generationConfig: {
-            temperature: 1.0,
-            topP: 0.9,
-            maxOutputTokens: 60,
-          },
-        });
-
-        const system = `
-You write ONE first-person action a bot takes in an adventure game.
-Rules:
-- Output ONE sentence.
-- 8 to 22 words.
-- No quotes, no lists, no emojis.
-- Be specific and varied; avoid generic "I proceed carefully" phrasing.
-- Must be plausible given the scenario and personality.
-- No meta commentary.
-`.trim();
-
-        const user = `
-Bot: ${botName}
-Lives: ${lives}
-Personality: ${personality}
-Scenario: ${scenario}
-
-Write the bot's action:
-`.trim();
-
-        const result = await model.generateContent([system, user]);
-        const raw = result.response.text() || "";
-        cleaned = cleanAction(raw);
-
-        if (!isValidAction(cleaned)) {
-          throw new Error("Invalid AI action generated");
-        }
-      } catch (aiError) {
-        console.error("Failed to generate bot action with AI:", aiError);
-        // Fall through to use fallback
-      }
+      actionText = await generateBotActionWithGemini3({
+        botName,
+        lives,
+        personality,
+        scenario,
+      });
     }
 
-    // Fallback bot actions if AI fails
-    if (!cleaned) {
+    if (!actionText) {
       const fallbackActions = [
-        "I carefully examine my surroundings for any hidden dangers before proceeding cautiously forward.",
-        "I draw my weapon and prepare to defend myself while looking for an escape route.",
-        "I attempt to negotiate peacefully while keeping my guard up and watching for threats.",
-        "I search for an alternative path that might be safer than the obvious route ahead.",
-        "I use my supplies to create a distraction and slip away from the immediate danger.",
-        "I observe the situation from a safe distance to better understand what I'm dealing with.",
-        "I trust my instincts and make a quick decisive move to get past this obstacle.",
-        "I call out to see if there's anyone or anything that might respond before acting.",
+        "I steady my breathing and commit to a decisive solution, accepting the cost to save lives.",
+        "I choose the safer path and move with controlled focus, refusing to let panic win.",
+        "I act quickly and commit to one option, keeping my fear buried under practiced calm.",
+        "I prioritize saving the innocents and accept the sacrifice, moving with grim determination.",
       ];
-      cleaned =
-        fallbackActions[Math.floor(Math.random() * fallbackActions.length)];
+      actionText = fallbackActions[Math.floor(Math.random() * fallbackActions.length)];
     }
 
-    // Now evaluate the bot's action
-    const actionResult = await evaluateAction(cleaned, scenario);
+    const actionResult = await evaluateAction(actionText, scenario);
 
     let outcome = actionResult.outcome;
 
     if (actionResult.success) {
-      // Bot succeeded - move to letter selection phase
       currentPlayer.score += 10;
       gameState.phase = "letter-selection";
       outcome += " Success!";
     } else {
-      // Bot failed - lose a life
       currentPlayer.lives -= 1;
 
       if (currentPlayer.lives <= 0) {
@@ -144,11 +385,9 @@ Write the bot's action:
         outcome += ` Lost a life! ${currentPlayer.lives} remaining.`;
       }
 
-      // Check if all players are eliminated
       const alivePlayers = gameState.players.filter((p: any) => p.isAlive);
 
       if (alivePlayers.length === 0) {
-        // All players eliminated - game over, highest score wins
         gameState.phase = "game-over";
         const winner = [...gameState.players].sort(
           (a: any, b: any) => b.score - a.score
@@ -156,7 +395,6 @@ Write the bot's action:
         gameState.winner = winner.id;
         outcome += " All players have been eliminated!";
       } else if (alivePlayers.length === 1) {
-        // One player left - they win
         gameState.phase = "game-over";
         gameState.winner = alivePlayers[0].id;
         outcome += ` ${alivePlayers[0].name} is the last one standing!`;
@@ -170,14 +408,12 @@ Write the bot's action:
     return NextResponse.json({
       gameState: serializeGameState(gameState),
       outcome,
-      botAction: cleaned,
+      botAction: actionText,
     });
   } catch (e: any) {
-    console.error("Gemini bot-action error:", e);
-    console.error("Error stack:", e?.stack);
-    console.error("Error message:", e?.message);
+    console.error("Bot-action route error:", e);
     return NextResponse.json(
-      { error: e?.message || "AI generation failed" },
+      { error: e?.message || "Failed to process bot action" },
       { status: 500 }
     );
   }
@@ -201,7 +437,7 @@ async function evaluateAction(
 
 EVALUATION CRITERIA:
 - Smart, cautious actions that assess risk = SUCCESS
-- Creative solutions that address the problem = SUCCESS  
+- Creative solutions that address the problem = SUCCESS
 - Reckless actions without thought = FAILURE
 - Actions that ignore obvious dangers = FAILURE
 - Moderate risk with preparation = 60% chance SUCCESS
@@ -217,26 +453,20 @@ Be CONSISTENT: Similar actions should get similar results.`;
 
 PLAYER ACTION: "${action}"
 
-Does this action succeed? Consider: Is it thoughtful? Does it address the danger? Is it reckless?
+Does this action succeed?
 
 Respond ONLY with valid JSON.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-exp:generateContent?key=${apiKey}`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: systemPrompt + "\n\n" + userPrompt }],
-            },
-          ],
+          contents: [{ parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 200,
+            maxOutputTokens: 220,
           },
         }),
       }
@@ -250,13 +480,11 @@ Respond ONLY with valid JSON.`;
     }
 
     const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text.trim();
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim?.() ?? "";
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      return result;
-    }
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
 
     return {
       success: Math.random() > 0.4,

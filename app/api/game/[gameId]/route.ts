@@ -7,7 +7,6 @@ export async function GET(
 ) {
   try {
     const { gameId } = await params;
-    console.log("Fetching game state for:", gameId);
     const gameState = await getGame(gameId);
 
     if (!gameState) {

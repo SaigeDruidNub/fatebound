@@ -20,7 +20,6 @@ function generatePlayerId(): string {
 export async function POST(request: NextRequest) {
   try {
     const { gameId } = await request.json();
-    console.log("Add bot request for game:", gameId);
 
     const gameState = await getGame(gameId);
 

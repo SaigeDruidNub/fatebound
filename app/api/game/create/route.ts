@@ -13,14 +13,8 @@ function generatePlayerId(): string {
 async function generatePuzzle(difficulty: PuzzleDifficulty = "medium") {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  console.log(
-    `🧩 Generating puzzle. Difficulty: ${difficulty}, API key present: ${!!apiKey}`
-  );
 
   if (!apiKey) {
-    console.log(
-      "⚠️ No GEMINI_API_KEY found in create route, using fallback puzzles"
-    );
     // Fallback puzzles organized by difficulty
     const fallbackPuzzles: Record<
       PuzzleDifficulty,
@@ -196,7 +190,7 @@ Respond with ONLY this JSON (no extra text):
 Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
@@ -213,7 +207,6 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
       }
     );
 
-    console.log("📦 Gemini API response status:", response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -226,10 +219,6 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
     }
 
     const data = await response.json();
-    console.log(
-      "📦 Raw puzzle response:",
-      JSON.stringify(data).substring(0, 200)
-    );
 
     if (
       !data.candidates ||
@@ -241,13 +230,11 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
       throw new Error("Gemini API returned unexpected response structure");
     }
 
-    console.log("✅ Gemini API response received in create route");
     const text = data.candidates[0].content.parts[0].text.trim();
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const puzzle = JSON.parse(jsonMatch[0]);
-      console.log("✅ Generated puzzle in create route:", puzzle.phrase);
       return {
         phrase: puzzle.phrase.toUpperCase(),
         category: puzzle.category,
@@ -255,9 +242,6 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
       };
     }
 
-    console.log(
-      "⚠️ No JSON found in Gemini response in create route, using fallback"
-    );
     return {
       phrase: "GUARDIAN OF THE RUINS",
       category: "Mythic Protector",
@@ -413,7 +397,7 @@ SPECIFIC SCENARIO IDEAS:
 Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {

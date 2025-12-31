@@ -46,7 +46,6 @@ export default function Home() {
   // Sync gameId from gameState if needed
   useEffect(() => {
     if (gameState?.id && !gameId) {
-      console.log("Syncing gameId from gameState:", gameState.id);
       setGameId(gameState.id);
     }
   }, [gameState, gameId]);
@@ -74,7 +73,6 @@ export default function Home() {
         })
           .then((res) => res.json())
           .then((data) => {
-            console.log("Leaderboard entry submitted:", data);
           })
           .catch((error) => {
             console.error("Failed to submit leaderboard entry:", error);
@@ -256,7 +254,6 @@ export default function Home() {
       }
 
       const data = await response.json();
-      console.log("Game created:", data);
       setGameId(data.gameId);
       setPlayerId(data.playerId);
       setGameState(data.gameState);
@@ -305,13 +302,10 @@ export default function Home() {
           ? `/api/leaderboard?difficulty=${difficulty}&limit=10`
           : `/api/leaderboard?limit=10`;
 
-      console.log("🏆 Fetching leaderboard from:", url);
       const response = await fetch(url);
-      console.log("🏆 Leaderboard response status:", response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log("🏆 Leaderboard data:", data);
         setLeaderboardData(data.leaderboard);
       } else {
         console.error(
@@ -326,12 +320,8 @@ export default function Home() {
   };
 
   const openLeaderboard = async () => {
-    console.log("🎯 openLeaderboard called");
-    console.log("🎯 Current leaderboardDifficulty:", leaderboardDifficulty);
     setShowLeaderboard(true);
-    console.log("🎯 showLeaderboard set to true");
     await fetchLeaderboard(leaderboardDifficulty);
-    console.log("🎯 fetchLeaderboard completed");
   };
 
   const startGame = async () => {
@@ -358,7 +348,6 @@ export default function Home() {
       return;
     }
 
-    console.log("Adding bot to game:", gameId);
     setLoading(true);
     try {
       const response = await fetch("/api/game/add-bot", {
@@ -367,11 +356,6 @@ export default function Home() {
         body: JSON.stringify({ gameId }),
       });
 
-      console.log(
-        "Add bot response status:",
-        response.status,
-        response.statusText
-      );
 
       if (!response.ok) {
         let errorMessage = "Unknown error";
@@ -388,7 +372,6 @@ export default function Home() {
       }
 
       const data = await response.json();
-      console.log("Bot added successfully, new game state:", data);
       setGameState(data.gameState);
       setMessage("");
     } catch (error) {
@@ -421,11 +404,6 @@ export default function Home() {
     setLoading(true);
     setLastOutcome("");
 
-    console.log("Submitting action:", {
-      gameId,
-      playerId,
-      action: action.substring(0, 50),
-    });
 
     try {
       const response = await fetch("/api/game/action", {
@@ -434,7 +412,6 @@ export default function Home() {
         body: JSON.stringify({ gameId, playerId, action }),
       });
 
-      console.log("Response status:", response.status);
 
       if (!response.ok) {
         let errorData;
@@ -453,7 +430,6 @@ export default function Home() {
       }
 
       const data = await response.json();
-      console.log("Action response:", data);
 
       if (data.gameState) {
         setGameState(data.gameState);
@@ -480,7 +456,6 @@ export default function Home() {
       return;
     }
 
-    console.log("Submitting letter:", selectedLetter, "for game:", gameId);
     setLoading(true);
     try {
       const response = await fetch("/api/game/letter", {
@@ -489,11 +464,6 @@ export default function Home() {
         body: JSON.stringify({ gameId, playerId, letter: selectedLetter }),
       });
 
-      console.log(
-        "Letter response status:",
-        response.status,
-        response.statusText
-      );
 
       if (!response.ok) {
         let errorMessage = "Failed to submit letter";
@@ -513,7 +483,6 @@ export default function Home() {
       }
 
       const data = await response.json();
-      console.log("Letter submitted successfully:", data);
       if (data.gameState) {
         setGameState(data.gameState);
       }
@@ -1180,7 +1149,6 @@ export default function Home() {
             <div className="flex gap-4 justify-center">
               <button
                 onClick={() => {
-                  console.log("🎯 Leaderboard button clicked!");
                   openLeaderboard();
                 }}
                 className="mt-8 rounded-lg bg-[#B06821] px-8 py-3 font-semibold text-white transition-colors hover:bg-[#9E2C21]"

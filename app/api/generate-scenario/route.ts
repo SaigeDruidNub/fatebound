@@ -37,47 +37,9 @@ export async function POST(request: NextRequest) {
             .join("\n")}\n\nCreate something COMPLETELY DIFFERENT.`
         : "";
 
-    const systemPrompt = `Create a dramatic adventure challenge for a game (2-3 sentences max).
-
-REQUIREMENTS:
-✓ Present a clear danger or obstacle
-✓ Give players a meaningful choice
-✓ End with "What do you do?"
-✓ Be specific and vivid (not generic)
-✓ Create tension and urgency
-✓ Use fresh, unexpected scenarios
-
-AVOID:
-✗ Falling/collapsing floors or bridges
-✗ Bottomless pits or falling hazards  
-✗ Overused fantasy clichés
-✗ Vague descriptions
-✗ Generic "dark room" or "mysterious sound" setups
-
-DANGER TYPES (rotate through these):
-• Enemy/creature encounter (bandits, wolves, trolls, cultists)
-• Environmental threat (fire, poison gas, thorns, quicksand, flood)
-• Moral dilemma (save stranger vs escape, share food, trust NPC)
-• Resource crisis (weapon breaks, lost supplies, time running out)
-• Mystery/puzzle (cursed item, locked door with riddle, shifting maze)
-• Social encounter (checkpoint guards, rival adventurers, desperate merchant)
-• Magical threat (living shadows, spell backlash, haunted objects)
-• Weather/nature (sudden storm, avalanche threat, predator territory)
-
-SPECIFIC SCENARIO IDEAS:
-- Wounded animal blocking path (mother bear with cubs)
-- Suspicious food/drink offered by stranger
-- Fork in path with different sounds/smells from each
-- Something valuable but obviously trapped
-- NPC begging for help with suspicious timing
-- Equipment failure at worst moment
-- Moral choice with time pressure
-- Creature that might be reasoned with${recentScenariosText}
-
-Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
-
+    const prompt = `Create a vivid, unique adventure scenario (2 sentences, end with 'What do you do?'). Avoid clichés. Be specific.`;
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
@@ -86,13 +48,13 @@ Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
         body: JSON.stringify({
           contents: [
             {
-              parts: [{ text: systemPrompt }],
+              parts: [{ text: prompt }],
             },
           ],
           generationConfig: {
-            temperature: 1.4,
-            maxOutputTokens: 150,
-            topP: 0.95,
+            temperature: 1.2,
+            maxOutputTokens: 80,
+            responseMimeType: "text/plain",
           },
         }),
       }

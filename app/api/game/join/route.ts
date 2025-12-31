@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
   try {
     const { gameId, playerName } = await request.json();
 
-    console.log(`🎮 Attempting to join game: ${gameId}, player: ${playerName}`);
 
     const gameState = await getGame(gameId);
 
@@ -42,7 +41,6 @@ export async function POST(request: NextRequest) {
     gameState.players.push(player);
     await setGame(gameId, gameState);
 
-    console.log(`✅ Player ${playerName} joined game ${gameId}`);
 
     return NextResponse.json({
       playerId,

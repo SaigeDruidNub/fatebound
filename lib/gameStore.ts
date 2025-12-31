@@ -36,10 +36,7 @@ async function getMongoClient() {
       { name: "difficulty_score_date" }
     );
 
-    console.log("✅ Connected to MongoDB");
-    console.log(
-      `📦 Using database: "${db.databaseName}", collections: "games", "leaderboard"`
-    );
+  
     return { client, db, gamesCollection, leaderboardCollection };
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
@@ -82,14 +79,12 @@ export async function getGame(gameId: string) {
       if (mongo?.gamesCollection) {
         const doc = await mongo.gamesCollection.findOne({ gameId });
         const game = doc ? deserializeFromStorage(doc.gameState) : null;
-        console.log(`Getting game ${gameId}:`, game ? "found" : "not found");
         return game;
       }
     }
 
     // Fallback to in-memory storage
     const game = localGames.get(gameId);
-    console.log(`Getting game ${gameId}:`, game ? "found" : "not found");
     return game;
   } catch (error) {
     console.error(`Error fetching game ${gameId}:`, error);
@@ -103,7 +98,6 @@ export async function setGame(gameId: string, gameState: any) {
     if (isMongoConfigured()) {
       const mongo = await getMongoClient();
       if (mongo?.gamesCollection) {
-        console.log(`💾 Saving game ${gameId} to MongoDB...`);
         const serialized = serializeForStorage(gameState);
         await mongo.gamesCollection.updateOne(
           { gameId },
@@ -116,17 +110,12 @@ export async function setGame(gameId: string, gameState: any) {
           },
           { upsert: true }
         );
-        console.log(`✅ Game ${gameId} saved successfully to MongoDB`);
         return;
       }
     }
 
     // Fallback to in-memory storage
-    console.log(`💾 Saving game ${gameId} to local memory...`);
     localGames.set(gameId, gameState);
-    console.log(
-      `✅ Game ${gameId} saved successfully to memory (${localGames.size} total games)`
-    );
   } catch (error) {
     console.error(`Error saving game ${gameId}:`, error);
     // Fallback to local storage on error
@@ -140,14 +129,12 @@ export async function deleteGame(gameId: string) {
       const mongo = await getMongoClient();
       if (mongo?.gamesCollection) {
         await mongo.gamesCollection.deleteOne({ gameId });
-        console.log(`🗑️ Game ${gameId} deleted from MongoDB`);
         return;
       }
     }
 
     // Fallback to in-memory storage
     localGames.delete(gameId);
-    console.log(`🗑️ Game ${gameId} deleted from memory`);
   } catch (error) {
     console.error(`Error deleting game ${gameId}:`, error);
     localGames.delete(gameId);
@@ -192,27 +179,21 @@ export async function saveLeaderboardEntry(entry: LeaderboardEntry) {
     if (isMongoConfigured()) {
       const mongo = await getMongoClient();
       if (mongo?.leaderboardCollection) {
-        console.log(
-          `💾 Saving leaderboard entry for ${entry.playerName} (${entry.difficulty})...`
-        );
         await mongo.leaderboardCollection.insertOne({
           ...entry,
           createdAt: new Date(),
         });
-        console.log(`✅ Leaderboard entry saved successfully to MongoDB`);
         return;
       }
     }
 
     // Fallback to in-memory storage
-    console.log(`💾 Saving leaderboard entry to local memory...`);
     localLeaderboard.push(entry);
     // Keep only top 100 entries in memory to prevent memory bloat
     localLeaderboard.sort((a, b) => b.score - a.score);
     if (localLeaderboard.length > 100) {
       localLeaderboard.length = 100;
     }
-    console.log(`✅ Leaderboard entry saved to memory`);
   } catch (error) {
     console.error("Error saving leaderboard entry:", error);
     // Fallback to local storage on error
@@ -228,11 +209,6 @@ export async function getLeaderboard(
     if (isMongoConfigured()) {
       const mongo = await getMongoClient();
       if (mongo?.leaderboardCollection) {
-        console.log(
-          `🔍 Fetching leaderboard from MongoDB (difficulty: ${
-            difficulty || "all"
-          })...`
-        );
         const query = difficulty ? { difficulty } : {};
         const entries = await mongo.leaderboardCollection
           .find(query)
@@ -251,11 +227,6 @@ export async function getLeaderboard(
     }
 
     // Fallback to in-memory storage
-    console.log(
-      `🔍 Fetching leaderboard from local memory (difficulty: ${
-        difficulty || "all"
-      })...`
-    );
     let filtered = difficulty
       ? localLeaderboard.filter((e) => e.difficulty === difficulty)
       : [...localLeaderboard];
