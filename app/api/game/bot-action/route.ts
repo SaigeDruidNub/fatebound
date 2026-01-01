@@ -466,7 +466,7 @@ Respond ONLY with valid JSON.`;
           contents: [{ parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 220,
+            maxOutputTokens: 500,
           },
         }),
       }

@@ -52,9 +52,11 @@ export async function POST(request: NextRequest) {
             },
           ],
           generationConfig: {
-            temperature: 1.2,
-            maxOutputTokens: 80,
+            temperature: 0.4,
+            topP: 0.9,
+            maxOutputTokens: 700,
             responseMimeType: "text/plain",
+            stopSequences: ["What do you do?"],
           },
         }),
       }

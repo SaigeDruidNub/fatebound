@@ -102,96 +102,98 @@ async function evaluateAction(
   const systemInstruction = `
 You are a fair dungeon master judging a player action.
 
-Return ONLY a JSON object matching the provided schema.
-No markdown. No preface. No extra keys.
-Outcome must be 2 sentences and specific to the scenario + action.
-Smart/cautious/creative = success. Reckless/ignoring danger = failure.
+OUTPUT FORMAT (MUST FOLLOW):
+- Output EXACTLY ONE line.
+- The line MUST start with either "S:" (success) or "F:" (failure).
+- After that, write a 1–2 sentence dramatic outcome specific to the scenario and action.
+- Do NOT write the word JSON.
+- Do NOT add prefaces like "Here is..." or any extra lines.
+- Keep it short (max ~35 words).
 `.trim();
 
-  const responseSchema = {
-    type: "OBJECT",
-    properties: {
-      success: { type: "BOOLEAN" },
-      outcome: { type: "STRING" },
-    },
-    required: ["success", "outcome"],
-  } as const;
-
-  function validate(obj: any): obj is { success: boolean; outcome: string } {
-    return (
-      obj &&
-      typeof obj.success === "boolean" &&
-      typeof obj.outcome === "string" &&
-      obj.outcome.trim().length > 0
-    );
-  }
+  const basePrompt = `SCENARIO: ${scenario}\nACTION: "${action}"`;
 
   async function callGemini(promptText: string, retry: boolean) {
     const resp = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": apiKey || "",
+        "x-goog-api-key": apiKey,
       } as HeadersInit,
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemInstruction }] },
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         generationConfig: {
           temperature: retry ? 0.2 : 0.4,
-          maxOutputTokens: 220,
-          responseMimeType: "application/json",
-          // KEY: schema-constrained output
-          responseSchema,
+          topP: 0.9,
+          maxOutputTokens: 500,
+          // stop after one line to prevent rambling
+          stopSequences: ["\n"],
         },
       }),
     });
 
-    if (!resp.ok) return { ok: false as const, text: "", raw: null };
+    if (!resp.ok) return "";
 
     const raw = await resp.json();
-    const text = raw?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-    // Log useful debugging signals (why truncation happens)
-    // (Finish reason is often "MAX_TOKENS" / "SAFETY" / "STOP" etc.)
     const finishReason = raw?.candidates?.[0]?.finishReason;
     if (finishReason)
       console.warn("[evaluateAction] finishReason:", finishReason);
 
-    return { ok: true as const, text: String(text).trim(), raw };
+    const parts = raw?.candidates?.[0]?.content?.parts ?? [];
+    const text = parts
+      .map((p: any) => p?.text ?? "")
+      .join("")
+      .trim();
+    return text;
   }
 
-  const basePrompt = `SCENARIO: ${scenario}\nACTION: "${action}"`;
+  function parseLine(
+    line: string
+  ): { success: boolean; outcome: string } | null {
+    const t = (line || "").trim();
 
-  // Attempt 1
-  try {
-    const r1 = await callGemini(basePrompt, false);
-    if (r1.ok) {
-      // With responseMimeType+schema, many responses are directly parseable JSON
-      try {
-        const obj = JSON.parse(r1.text);
-        if (validate(obj))
-          return { success: obj.success, outcome: obj.outcome.trim() };
-      } catch {
-        // Fall through to attempt 2
-        console.warn("⚠️ Attempt 1 not parseable:", r1.text);
-      }
+    if (t.startsWith("S:")) {
+      const outcome = t.slice(2).trim();
+      if (!outcome) return null;
+      return { success: true, outcome };
     }
 
-    // Attempt 2: repair prompt (handles “{” or “Here is …”)
+    if (t.startsWith("F:")) {
+      const outcome = t.slice(2).trim();
+      if (!outcome) return null;
+      return { success: false, outcome };
+    }
+
+    return null;
+  }
+
+  try {
+    // Attempt 1
+    const t1 = await callGemini(basePrompt, false);
+    const p1 = parseLine(t1);
+    if (p1) return p1;
+    console.warn("⚠️ Attempt 1 not parseable:", t1);
+
+    // Attempt 2 (repair)
     const repairPrompt =
       basePrompt +
-      `\n\nYour previous output was invalid. Return ONLY the JSON object matching the schema.`;
+      `\n\nREPAIR: Output ONE line starting with S: or F: only. No other text.`;
 
-    const r2 = await callGemini(repairPrompt, true);
-    if (r2.ok) {
-      try {
-        const obj = JSON.parse(r2.text);
-        if (validate(obj))
-          return { success: obj.success, outcome: obj.outcome.trim() };
-      } catch {
-        console.warn("⚠️ Attempt 2 not parseable:", r2.text);
-      }
-    }
+    const t2 = await callGemini(repairPrompt, true);
+    const p2 = parseLine(t2);
+    if (p2) return p2;
+    console.warn("⚠️ Attempt 2 not parseable:", t2);
+
+    // Attempt 3 (hard repair)
+    const hardPrompt =
+      basePrompt +
+      `\n\nFINAL: Start your reply with exactly "S:" or "F:" then the outcome.`;
+
+    const t3 = await callGemini(hardPrompt, true);
+    const p3 = parseLine(t3);
+    if (p3) return p3;
+    console.warn("⚠️ Attempt 3 not parseable:", t3);
 
     return evaluateActionFallback(action);
   } catch (err) {

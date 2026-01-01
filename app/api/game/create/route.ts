@@ -199,9 +199,9 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
         body: JSON.stringify({
           contents: [{ parts: [{ text: systemPrompt }] }],
           generationConfig: {
-            temperature: 1.3,
-            maxOutputTokens: 5000,
-            topP: 0.95,
+            temperature: 0.6,
+            maxOutputTokens: 500,
+            topP: 0.9,
           },
         }),
       }

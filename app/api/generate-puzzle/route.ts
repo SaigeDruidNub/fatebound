@@ -184,8 +184,8 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
             },
           ],
           generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 300,
+            temperature: 0.6,
+            maxOutputTokens: 500,
             responseMimeType: "application/json",
           },
         }),
