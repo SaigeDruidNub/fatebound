@@ -27,6 +27,8 @@ export interface GameState {
     revealedLetters: Set<string>;
     difficulty: PuzzleDifficulty;
   };
+  /** All letters guessed so far (correct and incorrect) */
+  selectedLetters: string[];
   currentScenario: string;
   scenarioHistory: string[];
   roundNumber: number;

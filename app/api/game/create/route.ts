@@ -13,7 +13,6 @@ function generatePlayerId(): string {
 async function generatePuzzle(difficulty: PuzzleDifficulty = "medium") {
   const apiKey = process.env.GEMINI_API_KEY;
 
-
   if (!apiKey) {
     // Fallback puzzles organized by difficulty
     const fallbackPuzzles: Record<
@@ -206,7 +205,6 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
         }),
       }
     );
-
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -467,7 +465,33 @@ export async function POST(request: NextRequest) {
 
     const gameId = generateGameId();
     const playerId = generatePlayerId();
-    const puzzle = await generatePuzzle(difficulty as PuzzleDifficulty);
+
+    // Fetch puzzle from /api/generate-puzzle
+    let puzzle;
+    try {
+      const puzzleRes = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+        }/api/generate-puzzle`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ difficulty }),
+        }
+      );
+      const puzzleData = await puzzleRes.json();
+      puzzle = {
+        phrase: puzzleData.phrase,
+        category: puzzleData.category,
+        difficulty: puzzleData.difficulty,
+        debug: puzzleData.debug,
+        test: puzzleData.test,
+      };
+    } catch (err) {
+      // fallback to local
+      puzzle = await generatePuzzle(difficulty as PuzzleDifficulty);
+    }
+
     const scenario = await generateScenario();
 
     const player: Player = {
@@ -490,8 +514,9 @@ export async function POST(request: NextRequest) {
         revealedLetters: new Set(),
         difficulty: puzzle.difficulty || (difficulty as PuzzleDifficulty),
       },
+      selectedLetters: [],
       currentScenario: scenario,
-      scenarioHistory: [scenario],
+      scenarioHistory: [scenario as string],
       roundNumber: 1,
       winner: null,
       createdAt: Date.now(),

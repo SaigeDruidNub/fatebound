@@ -47,170 +47,374 @@ const DIFFICULTY_CONFIG: Record<PuzzleDifficulty, DifficultySettings> = {
   },
 };
 
+const FALLBACK_PUZZLES: Record<
+  PuzzleDifficulty,
+  Array<{ phrase: string; category: string }>
+> = {
+  easy: [
+    { phrase: "MAGIC SWORD", category: "Legendary Weapon" },
+    { phrase: "DRAGON SLAYER", category: "Heroic Title" },
+    { phrase: "DARK FOREST", category: "Spooky Place" },
+    { phrase: "LOST TREASURE", category: "Quest Goal" },
+    { phrase: "STONE CASTLE", category: "Ancient Structure" },
+  ],
+  medium: [
+    { phrase: "THE TREASURE IS CURSED", category: "Adventure Warning" },
+    { phrase: "BEWARE OF THE DRAGON", category: "Monster Alert" },
+    { phrase: "GUARDIAN OF THE RUINS", category: "Mythic Title" },
+    { phrase: "SWORD IN THE STONE", category: "Legendary Artifact" },
+    { phrase: "CURSE OF THE PHARAOH", category: "Ancient Doom" },
+  ],
+  hard: [
+    { phrase: "SHADOW OF THE FORGOTTEN KING", category: "Dark Legacy" },
+    { phrase: "WHISPERS IN THE ANCIENT TOMB", category: "Eerie Mystery" },
+    { phrase: "KEEPER OF THE SACRED FLAME", category: "Holy Guardian" },
+    { phrase: "PROPHECY OF THE CRIMSON MOON", category: "Dark Omen" },
+    { phrase: "GUARDIAN OF CELESTIAL SECRETS", category: "Cosmic Keeper" },
+  ],
+  "very-hard": [
+    { phrase: "CHRONICLE OF THE FALLEN EMPIRE", category: "Ancient History" },
+    {
+      phrase: "REMNANTS OF THE CELESTIAL GUARDIAN ORDER",
+      category: "Lost Organization",
+    },
+    {
+      phrase: "PROPHECY OF THE WANDERING SHADOW LORDS",
+      category: "Dark Prophecy",
+    },
+    {
+      phrase: "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+      category: "Mystic Secret",
+    },
+    {
+      phrase: "LEGEND OF THE ETERNAL TWILIGHT REALM",
+      category: "Mythic Dimension",
+    },
+  ],
+};
+
+function pickFallback(difficulty: PuzzleDifficulty) {
+  const puzzles = FALLBACK_PUZZLES[difficulty];
+  return puzzles[Math.floor(Math.random() * puzzles.length)];
+}
+
+function normalizePhrase(raw: string) {
+  return (raw || "")
+    .toUpperCase()
+    .replace(/[^A-Z ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wordCount(phrase: string) {
+  return phrase.split(/\s+/).filter(Boolean).length;
+}
+
+function wordRangeForDifficulty(difficulty: PuzzleDifficulty): [number, number] {
+  switch (difficulty) {
+    case "easy":
+      return [2, 3];
+    case "medium":
+      return [3, 4];
+    case "hard":
+      return [4, 5];
+    case "very-hard":
+      return [5, 6];
+    default:
+      return [3, 4];
+  }
+}
+
+/**
+ * Accept BOTH formats:
+ * 1) PHRASE=...|CATEGORY=...
+ * 2) PHRASE=...\nCATEGORY=...
+ */
+function parsePuzzle(text: string) {
+  const t = (text || "").trim();
+
+  // One-line pipe form
+  const pipe = t.match(/PHRASE\s*[:=]\s*(.+?)\s*\|\s*CATEGORY\s*[:=]\s*(.+)$/i);
+  if (pipe) {
+    const phrase = normalizePhrase(pipe[1]);
+    const category = (pipe[2] || "").trim();
+    if (phrase && category && /^[A-Z ]+$/.test(phrase)) return { phrase, category };
+    return null;
+  }
+
+  // Two-line form
+  const phraseLine = t.match(/PHRASE\s*[:=]\s*(.+)/i);
+  const catLine = t.match(/CATEGORY\s*[:=]\s*(.+)/i);
+  if (phraseLine && catLine) {
+    const phrase = normalizePhrase(phraseLine[1]);
+    const category = (catLine[1] || "").trim();
+    if (phrase && category && /^[A-Z ]+$/.test(phrase)) return { phrase, category };
+    return null;
+  }
+
+  // Phrase-only form (we can salvage by asking for category)
+  if (phraseLine && !catLine) {
+    const phrase = normalizePhrase(phraseLine[1]);
+    if (phrase && /^[A-Z ]+$/.test(phrase)) return { phrase, category: "" };
+  }
+
+  return null;
+}
+
+async function generatePuzzleWithGemini(params: {
+  apiKey: string;
+  difficulty: PuzzleDifficulty;
+  config: DifficultySettings;
+}): Promise<{ phrase: string; category: string } | null> {
+  const { apiKey, difficulty, config } = params;
+  const [minW, maxW] = wordRangeForDifficulty(difficulty);
+  const targetWords = Math.random() < 0.5 ? minW : maxW;
+
+  const examplesText = config.examples.map((ex) => `- ${ex}`).join("\n");
+
+  const systemInstruction = `
+You generate Wheel-of-Fortune style puzzle phrases for a fantasy adventure game.
+
+OUTPUT FORMAT (allowed):
+- Either ONE line: PHRASE=<PHRASE>|CATEGORY=<CATEGORY>
+- Or TWO lines:
+  PHRASE=<PHRASE>
+  CATEGORY=<CATEGORY>
+
+RULES FOR PHRASE:
+- CAPITAL LETTERS and SPACES only
+- NO punctuation, numbers, hyphens, apostrophes
+- NO proper nouns
+- EXACTLY ${targetWords} words
+- Adventure/fantasy themed, evocative, not generic
+
+RULES FOR CATEGORY:
+- 2 to 4 words, short adventure-related label
+
+DO NOT add extra commentary. Do NOT say "Here is...". Do NOT mention JSON.
+`.trim();
+
+  const userPrompt = `
+DIFFICULTY: ${difficulty.toUpperCase()}
+COMPLEXITY: ${config.complexity}
+
+EXAMPLES:
+${examplesText}
+
+Generate ONE new puzzle now.
+`.trim();
+
+  async function callGemini(promptText: string, retry: boolean) {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          contents: [{ role: "user", parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: retry ? 0.2 : 0.35,
+            topP: 0.9,
+            maxOutputTokens: 220,
+            // IMPORTANT: do NOT stop on "\n" or you'll cut off the CATEGORY line
+            // stopSequences: ["\n\n\n"], // optional, usually not needed
+          },
+        }),
+      }
+    );
+
+    if (!resp.ok) return { text: "", finishReason: null as any };
+
+    const data = await resp.json();
+    const finishReason = data?.candidates?.[0]?.finishReason ?? null;
+    if (finishReason) console.warn("[PUZZLE DEBUG] finishReason:", finishReason);
+
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.map((p: any) => p?.text ?? "").join("").trim();
+    return { text, finishReason };
+  }
+
+  // Attempt 1
+  const r1 = await callGemini(userPrompt, false);
+  let parsed = parsePuzzle(r1.text);
+
+  // Attempt 2: repair
+  if (!parsed || !parsed.phrase) {
+    console.warn(`[PUZZLE DEBUG] Attempt 1 not valid, raw:`, r1.text);
+    const repairPrompt =
+      userPrompt +
+      `\n\nREPAIR: Output only the PHRASE and CATEGORY in the required format. No extra words.`;
+
+    const r2 = await callGemini(repairPrompt, true);
+    parsed = parsePuzzle(r2.text);
+
+    if (!parsed) {
+      console.warn(`[PUZZLE DEBUG] Attempt 2 not valid, raw:`, r2.text);
+      return null;
+    }
+  }
+
+  // If we got phrase but missing category, ask category-only
+  if (parsed.category.trim() === "") {
+    const catSystem = `
+Create a category label for a fantasy Wheel-of-Fortune puzzle.
+
+RULES:
+- EXACTLY 2 to 4 words
+- Avoid single words like "AN" or "THE"
+- Output ONLY: CATEGORY=<CATEGORY>
+`.trim();
+
+
+    const catPrompt = `PHRASE: ${parsed.phrase}`;
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: catSystem }] },
+          contents: [{ role: "user", parts: [{ text: catPrompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.9,
+            maxOutputTokens: 60,
+          },
+        }),
+      }
+    );
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const parts = data?.candidates?.[0]?.content?.parts ?? [];
+      const txt = parts.map((p: any) => p?.text ?? "").join("").trim();
+      const m = txt.match(/CATEGORY\s*[:=]\s*(.+)$/i);
+      if (m) parsed.category = (m[1] || "").trim();
+    }
+  }
+
+  // Word count validation + rewrite salvage if needed
+  if (wordCount(parsed.phrase) !== targetWords) {
+    const rewriteSystem = `
+Rewrite a fantasy puzzle phrase to EXACTLY ${targetWords} words.
+
+RULES:
+- CAPITAL LETTERS and SPACES only
+- No punctuation or proper nouns
+- Return ONLY: PHRASE=<PHRASE>
+`.trim();
+
+    const rewritePrompt = `Original phrase: ${parsed.phrase}`;
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: rewriteSystem }] },
+          contents: [{ role: "user", parts: [{ text: rewritePrompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.9,
+            maxOutputTokens: 500,
+          },
+        }),
+      }
+    );
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const parts = data?.candidates?.[0]?.content?.parts ?? [];
+      const txt = parts.map((p: any) => p?.text ?? "").join("").trim();
+      const m = txt.match(/PHRASE\s*[:=]\s*(.+)$/i);
+      if (m) parsed.phrase = normalizePhrase(m[1]);
+    }
+  }
+
+  // Final guards
+  if (wordCount(parsed.phrase) !== targetWords) return null;
+  function isBadCategory(cat: string) {
+  const c = (cat || "").trim();
+  if (!c) return true;
+
+  const words = c.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return true;
+
+  // Avoid trivial determiners / truncations
+  const upper = c.toUpperCase();
+  const banned = new Set(["A", "AN", "THE", "OF", "IN", "ON", "TO"]);
+  if (words.length === 1 && banned.has(upper)) return true;
+  if (c.length < 6) return true;
+
+  return false;
+}
+
+// ... after your category-only salvage and phrase rewrite ...
+
+// Final guards
+if (wordCount(parsed.phrase) !== targetWords) return null;
+
+if (isBadCategory(parsed.category)) {
+  // last-ditch: local fallback category
+  // (better than rejecting a good phrase)
+  parsed.category =
+    difficulty === "hard" || difficulty === "very-hard"
+      ? "Dark Mystery"
+      : "Epic Quest";
+}
+
+return { phrase: parsed.phrase, category: parsed.category.trim() };
+
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const difficulty: PuzzleDifficulty = body.difficulty || "medium";
     const config = DIFFICULTY_CONFIG[difficulty];
 
+    console.log(`[PUZZLE DEBUG] Requested difficulty: hard`);
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      // Fallback puzzles organized by difficulty
-      const fallbackPuzzles: Record<
-        PuzzleDifficulty,
-        Array<{ phrase: string; category: string }>
-      > = {
-        easy: [
-          { phrase: "MAGIC SWORD", category: "Legendary Weapon" },
-          { phrase: "DRAGON SLAYER", category: "Heroic Title" },
-          { phrase: "DARK FOREST", category: "Spooky Place" },
-          { phrase: "LOST TREASURE", category: "Quest Goal" },
-          { phrase: "STONE CASTLE", category: "Ancient Structure" },
-        ],
-        medium: [
-          { phrase: "THE TREASURE IS CURSED", category: "Adventure Warning" },
-          { phrase: "BEWARE OF THE DRAGON", category: "Monster Alert" },
-          { phrase: "GUARDIAN OF THE RUINS", category: "Mythic Title" },
-          { phrase: "SWORD IN THE STONE", category: "Legendary Artifact" },
-          { phrase: "CURSE OF THE PHARAOH", category: "Ancient Doom" },
-        ],
-        hard: [
-          { phrase: "SHADOW OF THE FORGOTTEN KING", category: "Dark Legacy" },
-          { phrase: "WHISPERS IN THE ANCIENT TOMB", category: "Eerie Mystery" },
-          { phrase: "KEEPER OF THE SACRED FLAME", category: "Holy Guardian" },
-          { phrase: "PROPHECY OF THE CRIMSON MOON", category: "Dark Omen" },
-          {
-            phrase: "GUARDIAN OF CELESTIAL SECRETS",
-            category: "Cosmic Keeper",
-          },
-        ],
-        "very-hard": [
-          {
-            phrase: "CHRONICLE OF THE FALLEN EMPIRE STATE",
-            category: "Ancient History",
-          },
-          {
-            phrase: "REMNANTS OF THE CELESTIAL GUARDIAN ORDER",
-            category: "Lost Organization",
-          },
-          {
-            phrase: "PROPHECY OF THE WANDERING SHADOW LORDS",
-            category: "Dark Prophecy",
-          },
-          {
-            phrase: "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
-            category: "Mystic Secret",
-          },
-          {
-            phrase: "LEGEND OF THE ETERNAL TWILIGHT REALM",
-            category: "Mythic Dimension",
-          },
-        ],
-      };
-
-      const puzzles = fallbackPuzzles[difficulty];
-      const puzzle = puzzles[Math.floor(Math.random() * puzzles.length)];
-      return NextResponse.json({ ...puzzle, difficulty });
+      const fb = pickFallback(difficulty);
+      console.log(`[PUZZLE DEBUG] Fallback selected:`, fb);
+      return NextResponse.json({
+        ...fb,
+        difficulty,
+        debug: { source: "fallback" },
+      });
     }
 
-    const examplesText = config.examples
-      .map((ex, i) => `${i + 1}. "${ex}"`)
-      .join("\n");
+    const puzzle = await generatePuzzleWithGemini({
+      apiKey,
+      difficulty,
+      config,
+    });
 
-    const systemPrompt = `Create a puzzle phrase for an adventure game like Wheel of Fortune.
-
-DIFFICULTY LEVEL: ${difficulty.toUpperCase()}
-
-REQUIREMENTS:
-- ${config.wordCount} total
-- ${config.complexity}
-- CAPITAL LETTERS ONLY (no lowercase)
-- NO punctuation, numbers, or special characters
-- NO PROPER NOUNS (no specific names of people, places, or unique entities)
-- Adventure/fantasy themed
-- Exciting and evocative
-- Use only common/generic nouns and descriptive words
-
-PHRASE TYPES (rotate through these):
-1. Action Imperatives: "CROSS THE BURNING BRIDGE"
-2. Dangerous Locations: "DEPTHS OF THE ABYSS"
-3. Mythic Creatures: "GUARDIAN OF THE GATE"
-4. Legendary Objects: "CROWN OF THE FORGOTTEN KING"
-5. Heroic Titles: "SLAYER OF SHADOW BEASTS"
-6. Dramatic Warnings: "BEWARE THE CRIMSON MOON"
-7. Ancient Mysteries: "RIDDLE OF THE STONES"
-8. Epic Events: "BATTLE FOR THE REALM"
-9. Supernatural Phenomena: "GHOSTS OF THE MANOR"
-10. Quest Objectives: "RESCUE THE LOST PRINCE"
-
-EXAMPLES FOR THIS DIFFICULTY:
-${examplesText}
-
-AVOID THESE:
-- Proper nouns (Zeus, Atlantis, Thor, Rome, etc.)
-- Specific character names or locations
-- "SEEK THE ANCIENT..."
-- "FIND THE LOST..."
-- "ESCAPE FROM THE..."
-- "DEFEAT THE EVIL..."
-- Generic "THE TREASURE" phrases
-
-Respond with ONLY this JSON (no extra text):
-{ "phrase": "YOUR PHRASE", "category": "Category Name" }
-
-Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
-
-    // The apiKey variable is already declared above, so this duplicate declaration is removed.
-
-    if (!apiKey) {
-      // ...existing code for fallback puzzles...
+    if (!puzzle) {
+      const fb = pickFallback(difficulty);
+      console.log(`[PUZZLE DEBUG] AI failed, fallback selected:`, fb);
+      return NextResponse.json({
+        ...fb,
+        difficulty,
+        debug: { source: "fallback_after_ai_failed" },
+      });
     }
 
-    // Concise Gemini API prompt
-    const prompt = `Fantasy puzzle phrase (${config.wordCount}, ${config.complexity}). Give a creative category. Respond as JSON: {"phrase": "...", "category": "..."}`;
+    console.log(`[PUZZLE DEBUG] Gemini puzzle:`, puzzle);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.6,
-            maxOutputTokens: 500,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "Failed to generate puzzle" },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-    // Directly return JSON if present
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      try {
-        const puzzle = JSON.parse(data.candidates[0].content.parts[0].text);
-        return NextResponse.json(puzzle);
-      } catch {
-        // fallback below
-      }
-    }
-    return NextResponse.json({ error: "No puzzle generated" }, { status: 500 });
+    return NextResponse.json({
+      ...puzzle,
+      difficulty,
+      debug: { source: "gemini" },
+    });
   } catch (error) {
+    console.error(`[PUZZLE DEBUG] Internal server error:`, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

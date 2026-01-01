@@ -70,7 +70,9 @@ function parseScenarioOptions(
 
   // Non-greedy capture up to the first comma after "You can ..."
   // then capture after "or" up to the next comma or "What do you do?"
-  const m = s.match(/\bYou can\s+(.*?)(?:,|\s)\s+or\s+(.*?)(?:,|\s+What do you do\?)/i);
+  const m = s.match(
+    /\bYou can\s+(.*?)(?:,|\s)\s+or\s+(.*?)(?:,|\s+What do you do\?)/i
+  );
 
   if (!m) return null;
 
@@ -117,7 +119,10 @@ function chooseOption(
 
   const fragTokens = frag.split(/\s+/).filter(Boolean);
   const score = (text: string) =>
-    fragTokens.reduce((acc, t) => (t.length >= 4 && text.includes(t) ? acc + 1 : acc), 0);
+    fragTokens.reduce(
+      (acc, t) => (t.length >= 4 && text.includes(t) ? acc + 1 : acc),
+      0
+    );
 
   const scoreA = score(a);
   const scoreB = score(b);
@@ -174,12 +179,11 @@ function expandFragmentAction(params: {
 
   const opts = parseScenarioOptions(params.scenario);
 
-  const style =
-    params.personality.includes("desperate")
-      ? "without hesitation"
-      : params.personality.includes("cautious")
-      ? "carefully controlling my breath"
-      : "with grim resolve";
+  const style = params.personality.includes("desperate")
+    ? "without hesitation"
+    : params.personality.includes("cautious")
+    ? "carefully controlling my breath"
+    : "with grim resolve";
 
   if (opts) {
     const pick = chooseOption(frag, opts, params.lives, params.personality);
@@ -188,7 +192,9 @@ function expandFragmentAction(params: {
     const clause = toFirstPersonPresent(chosen);
 
     // Build sentence; keep within 12–22 words by trimming variants.
-    let sentence = cleanAction(`I ${clause}, ${style}, before the danger tightens around us.`);
+    let sentence = cleanAction(
+      `I ${clause}, ${style}, before the danger tightens around us.`
+    );
     if (wordCount(sentence) > 22) {
       sentence = cleanAction(`I ${clause}, ${style}, before it is too late.`);
     }
@@ -203,14 +209,22 @@ function expandFragmentAction(params: {
 
   // If parsing fails, create a scenario-anchored generic action
   const anchors = extractScenarioAnchors(params.scenario);
-  const anchorText = anchors.length ? `against the ${anchors[0]}` : "against the threat";
+  const anchorText = anchors.length
+    ? `against the ${anchors[0]}`
+    : "against the threat";
 
-  let sentence = cleanAction(`I steady myself, ${style}, and act decisively ${anchorText} before time runs out.`);
+  let sentence = cleanAction(
+    `I steady myself, ${style}, and act decisively ${anchorText} before time runs out.`
+  );
   if (wordCount(sentence) > 22) {
-    sentence = cleanAction(`I steady myself, ${style}, and act decisively ${anchorText} before it is too late.`);
+    sentence = cleanAction(
+      `I steady myself, ${style}, and act decisively ${anchorText} before it is too late.`
+    );
   }
   if (wordCount(sentence) < 12) {
-    sentence = cleanAction(`I steady myself ${style} and act decisively ${anchorText} before it is too late.`);
+    sentence = cleanAction(
+      `I steady myself ${style} and act decisively ${anchorText} before it is too late.`
+    );
   }
   return sentence;
 }
@@ -296,7 +310,10 @@ Return only the ACTION line.
         personality,
         lives,
       });
-      console.log(`[BotAction] Expanded fragment (attempt ${attempt}):`, expanded);
+      console.log(
+        `[BotAction] Expanded fragment (attempt ${attempt}):`,
+        expanded
+      );
       candidate = expanded;
     }
 
@@ -364,7 +381,8 @@ export async function POST(req: NextRequest) {
         "I act quickly and commit to one option, keeping my fear buried under practiced calm.",
         "I prioritize saving the innocents and accept the sacrifice, moving with grim determination.",
       ];
-      actionText = fallbackActions[Math.floor(Math.random() * fallbackActions.length)];
+      actionText =
+        fallbackActions[Math.floor(Math.random() * fallbackActions.length)];
     }
 
     const actionResult = await evaluateAction(actionText, scenario);
@@ -402,6 +420,9 @@ export async function POST(req: NextRequest) {
         gameState.phase = "waiting-continue";
       }
     }
+
+    // If bot is moving to letter-selection, do NOT select a letter here.
+    // Letter selection for bots should be handled by the letter API route only.
 
     await setGame(gameId, gameState);
 
@@ -502,6 +523,7 @@ Respond ONLY with valid JSON.`;
 function serializeGameState(gameState: any) {
   return {
     ...gameState,
+    selectedLetters: Array.from(gameState.selectedLetters || []),
     puzzle: {
       ...gameState.puzzle,
       revealedLetters: Array.from(gameState.puzzle.revealedLetters),

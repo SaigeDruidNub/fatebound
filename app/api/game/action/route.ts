@@ -126,7 +126,7 @@ OUTPUT FORMAT (MUST FOLLOW):
         generationConfig: {
           temperature: retry ? 0.2 : 0.4,
           topP: 0.9,
-          maxOutputTokens: 500,
+          maxOutputTokens: 1000,
           // stop after one line to prevent rambling
           stopSequences: ["\n"],
         },

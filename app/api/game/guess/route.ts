@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
 function serializeGameState(gameState: any) {
   return {
     ...gameState,
+    selectedLetters: Array.from(gameState.selectedLetters || []),
     puzzle: {
       ...gameState.puzzle,
       revealedLetters: Array.from(gameState.puzzle.revealedLetters),

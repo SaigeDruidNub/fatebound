@@ -72,8 +72,7 @@ export default function Home() {
           }),
         })
           .then((res) => res.json())
-          .then((data) => {
-          })
+          .then((data) => {})
           .catch((error) => {
             console.error("Failed to submit leaderboard entry:", error);
           });
@@ -356,7 +355,6 @@ export default function Home() {
         body: JSON.stringify({ gameId }),
       });
 
-
       if (!response.ok) {
         let errorMessage = "Unknown error";
         try {
@@ -404,14 +402,12 @@ export default function Home() {
     setLoading(true);
     setLastOutcome("");
 
-
     try {
       const response = await fetch("/api/game/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameId, playerId, action }),
       });
-
 
       if (!response.ok) {
         let errorData;
@@ -463,7 +459,6 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameId, playerId, letter: selectedLetter }),
       });
-
 
       if (!response.ok) {
         let errorMessage = "Failed to submit letter";
@@ -1337,8 +1332,29 @@ export default function Home() {
         </div>
 
         {/* Main content */}
+
         <div className="flex-1 space-y-4">
           {renderPuzzleBoard()}
+
+          {/* Selected Letters Section */}
+          {gameState.selectedLetters &&
+            gameState.selectedLetters.length > 0 && (
+              <div className="bg-[#1B2A30]/60 p-4 rounded-lg backdrop-blur border border-[#305853]/40 mb-2">
+                <h3 className="text-[#B06821] font-bold mb-2 text-lg">
+                  Selected Letters
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {gameState.selectedLetters.map((letter, idx) => (
+                    <span
+                      key={letter + idx}
+                      className="inline-block px-3 py-2 rounded bg-[#305853] text-white text-xl font-mono border border-[#B06821]/40 shadow-sm"
+                    >
+                      {letter}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
           {/* Current scenario */}
           {gameState.phase === "playing" && (

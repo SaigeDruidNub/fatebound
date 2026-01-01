@@ -36,7 +36,6 @@ async function getMongoClient() {
       { name: "difficulty_score_date" }
     );
 
-  
     return { client, db, gamesCollection, leaderboardCollection };
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
@@ -53,6 +52,7 @@ const isMongoConfigured = () => {
 function serializeForStorage(gameState: any) {
   return {
     ...gameState,
+    selectedLetters: Array.from(gameState.selectedLetters || []),
     puzzle: {
       ...gameState.puzzle,
       revealedLetters: Array.from(gameState.puzzle.revealedLetters || []),
@@ -65,6 +65,9 @@ function deserializeFromStorage(gameState: any) {
   if (!gameState) return null;
   return {
     ...gameState,
+    selectedLetters: Array.isArray(gameState.selectedLetters)
+      ? gameState.selectedLetters
+      : [],
     puzzle: {
       ...gameState.puzzle,
       revealedLetters: new Set(gameState.puzzle.revealedLetters || []),
