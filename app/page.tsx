@@ -15,6 +15,8 @@ type GameState = {
     revealedLetters: string[];
     difficulty: PuzzleDifficulty;
   };
+  /** All letters guessed so far (correct and incorrect) */
+  selectedLetters: string[];
   currentScenario: string;
   roundNumber: number;
   winner: string | null;
