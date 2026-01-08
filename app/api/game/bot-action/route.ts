@@ -173,25 +173,36 @@ function expandFragmentAction(params: {
 
   if (!frag.startsWith("I ")) return "";
 
-  // If already valid-length, return as-is (still must pass validator later)
   const wc = wordCount(frag);
-  if (wc >= 12 && wc <= 22) return frag;
-
-  const opts = parseScenarioOptions(params.scenario);
-
   const style = params.personality.includes("desperate")
     ? "without hesitation"
     : params.personality.includes("cautious")
     ? "carefully controlling my breath"
     : "with grim resolve";
 
+  // If Gemini fragment is a valid action (starts with 'I' and has 4+ words), pad it with style/context
+  if (wc >= 4) {
+    let sentence = cleanAction(
+      `${frag}, ${style}, before the danger tightens around us.`
+    );
+    if (wordCount(sentence) > 22) {
+      sentence = cleanAction(`${frag}, ${style}, before it is too late.`);
+    }
+    if (wordCount(sentence) > 22) {
+      sentence = cleanAction(`${frag}, ${style}, to keep us alive.`);
+    }
+    if (wordCount(sentence) < 12) {
+      sentence = cleanAction(`${frag}, ${style}, to keep my party alive.`);
+    }
+    return sentence;
+  }
+
+  // Otherwise, use scenario options if available
+  const opts = parseScenarioOptions(params.scenario);
   if (opts) {
     const pick = chooseOption(frag, opts, params.lives, params.personality);
     const chosen = pick === "A" ? opts.optionA : opts.optionB;
-
     const clause = toFirstPersonPresent(chosen);
-
-    // Build sentence; keep within 12–22 words by trimming variants.
     let sentence = cleanAction(
       `I ${clause}, ${style}, before the danger tightens around us.`
     );
@@ -212,7 +223,6 @@ function expandFragmentAction(params: {
   const anchorText = anchors.length
     ? `against the ${anchors[0]}`
     : "against the threat";
-
   let sentence = cleanAction(
     `I steady myself, ${style}, and act decisively ${anchorText} before time runs out.`
   );
@@ -279,9 +289,9 @@ Return only the ACTION line.
           system_instruction: { parts: [{ text: systemInstruction }] },
           contents: [{ role: "user", parts: [{ text: userText }] }],
           generationConfig: {
-            temperature: 0.25,
+            temperature: 0.35,
             topP: 0.9,
-            maxOutputTokens: 140,
+            maxOutputTokens: 700,
           },
         }),
       }
@@ -301,6 +311,14 @@ Return only the ACTION line.
       `[BotAction] Extracted+Cleaned AI action (attempt ${attempt}):`,
       candidate
     );
+
+    // If Gemini output is just 'I' or 'I will' (less than 3 words), skip expansion and use fallback
+    if (candidate && wordCount(candidate) < 3) {
+      console.log(
+        `[BotAction] Gemini output too short, skipping expansion and using fallback.`
+      );
+      return ""; // triggers fallback logic in POST handler
+    }
 
     // Expand fragments using scenario-derived options (not hard-coded)
     if (candidate && wordCount(candidate) < 12) {
@@ -375,14 +393,53 @@ export async function POST(req: NextRequest) {
     }
 
     if (!actionText) {
-      const fallbackActions = [
-        "I steady my breathing and commit to a decisive solution, accepting the cost to save lives.",
-        "I choose the safer path and move with controlled focus, refusing to let panic win.",
-        "I act quickly and commit to one option, keeping my fear buried under practiced calm.",
-        "I prioritize saving the innocents and accept the sacrifice, moving with grim determination.",
-      ];
-      actionText =
-        fallbackActions[Math.floor(Math.random() * fallbackActions.length)];
+      // Try to use scenario options for a more relevant fallback
+      const opts = parseScenarioOptions(scenario);
+      const style = personality.includes("desperate")
+        ? "without hesitation"
+        : personality.includes("cautious")
+        ? "carefully controlling my breath"
+        : "with grim resolve";
+      let fallback = "";
+      if (opts) {
+        // Pick randomly or by risk
+        const pick = chooseOption("", opts, lives, personality);
+        const chosen = pick === "A" ? opts.optionA : opts.optionB;
+        const clause = toFirstPersonPresent(chosen);
+        fallback = cleanAction(
+          `I ${clause}, ${style}, determined to shape our fate in this moment.`
+        );
+        if (wordCount(fallback) < 12) {
+          fallback = cleanAction(
+            `I ${clause}, ${style}, to keep my party alive.`
+          );
+        }
+        if (wordCount(fallback) > 22) {
+          fallback = cleanAction(
+            `I ${clause}, ${style}, before it is too late.`
+          );
+        }
+      } else {
+        // Use scenario anchors or a generic fallback
+        const anchors = extractScenarioAnchors(scenario);
+        const anchorText = anchors.length
+          ? `against the ${anchors[0]}`
+          : "against the threat";
+        fallback = cleanAction(
+          `I steady myself, ${style}, and act decisively ${anchorText} before time runs out.`
+        );
+        if (wordCount(fallback) < 12) {
+          fallback = cleanAction(
+            `I steady myself ${style} and act decisively ${anchorText} before it is too late.`
+          );
+        }
+        if (wordCount(fallback) > 22) {
+          fallback = cleanAction(
+            `I steady myself, ${style}, and act decisively ${anchorText} before it is too late.`
+          );
+        }
+      }
+      actionText = fallback;
     }
 
     const actionResult = await evaluateAction(actionText, scenario);
@@ -421,8 +478,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If bot is moving to letter-selection, do NOT select a letter here.
-    // Letter selection for bots should be handled by the letter API route only.
+    // Do NOT select a letter here; letter selection for bots is handled by the letter API route only.
 
     await setGame(gameId, gameState);
 

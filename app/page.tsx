@@ -160,25 +160,54 @@ export default function Home() {
 
       setTimeout(async () => {
         try {
-          // Pick a random letter that hasn't been revealed yet
-          const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-          const availableLetters = alphabet
-            .split("")
-            .filter((l) => !gameState.puzzle.revealedLetters.includes(l));
-
-          if (availableLetters.length > 0) {
-            const randomLetter =
-              availableLetters[
-                Math.floor(Math.random() * availableLetters.length)
-              ];
-
+          // Use common English letter frequency for bot guesses
+          const commonLetters = [
+            "E",
+            "A",
+            "R",
+            "I",
+            "O",
+            "T",
+            "N",
+            "S",
+            "L",
+            "C",
+            "U",
+            "D",
+            "P",
+            "M",
+            "H",
+            "G",
+            "B",
+            "F",
+            "Y",
+            "W",
+            "K",
+            "V",
+            "X",
+            "Z",
+            "J",
+            "Q",
+          ];
+          const guessed = new Set([
+            ...(gameState.puzzle.revealedLetters || []),
+            ...(gameState.selectedLetters || []),
+          ]);
+          let chosenLetter = null;
+          for (const l of commonLetters) {
+            if (!guessed.has(l)) {
+              chosenLetter = l;
+              break;
+            }
+          }
+          if (chosenLetter) {
             const response = await fetch("/api/game/letter", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 gameId,
                 playerId: currentPlayer.id,
-                letter: randomLetter,
+                letter: chosenLetter,
               }),
             });
 
@@ -190,7 +219,7 @@ export default function Home() {
               setGameState(data.gameState);
               if (data.message) {
                 setMessage(
-                  `${currentPlayer.name} guesses ${randomLetter}: ${data.message}`
+                  `${currentPlayer.name} guesses ${chosenLetter}: ${data.message}`
                 );
               }
             }
@@ -1428,7 +1457,7 @@ export default function Home() {
                         disabled={loading || !selectedLetter}
                         className="flex-1 rounded-lg bg-[#B06821] px-4 sm:px-6 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white transition-colors hover:bg-[#9E2C21] disabled:bg-[#1B2A30]"
                       >
-                        Submit Letter
+                        {loading ? "Waiting..." : "Submit Letter"}
                       </button>
                     </div>
                   </div>

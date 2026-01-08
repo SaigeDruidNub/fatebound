@@ -7,7 +7,6 @@ export async function POST(request: NextRequest) {
     const { gameId, playerId, letter } = await request.json();
 
     const gameState = await getGame(gameId);
-
     if (!gameState) {
       console.error("Game not found for letter submission:", gameId);
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
@@ -19,7 +18,6 @@ export async function POST(request: NextRequest) {
         gameState.puzzle.revealedLetters
       );
     }
-
     // Ensure selectedLetters is an array
     if (!Array.isArray(gameState.selectedLetters)) {
       gameState.selectedLetters = [];
@@ -27,11 +25,14 @@ export async function POST(request: NextRequest) {
 
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
 
+    // Only the client should select a letter for the bot. Do not auto-select here.
+    const chosenLetter = letter;
+
     if (currentPlayer.id !== playerId) {
       return NextResponse.json({ error: "Not your turn" }, { status: 400 });
     }
 
-    const upperLetter = letter.toUpperCase();
+    const upperLetter = chosenLetter.toUpperCase();
 
     // Prevent duplicate guesses
     if (gameState.selectedLetters.includes(upperLetter)) {
