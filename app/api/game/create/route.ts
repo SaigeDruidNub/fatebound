@@ -562,17 +562,22 @@ export async function POST(request: NextRequest) {
     // Fetch puzzle from /api/generate-puzzle
     let puzzle;
     let remoteErrorDebug: any = null;
+    // Determine the correct base URL for internal API calls
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    // If running on Vercel, use VERCEL_URL or request headers
+    if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (request.headers.get("host")) {
+      // Use the host header from the incoming request (works for both prod and dev)
+      const proto = request.headers.get("x-forwarded-proto") || "http";
+      baseUrl = `${proto}://${request.headers.get("host")}`;
+    }
     try {
-      const puzzleRes = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-        }/api/generate-puzzle`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ difficulty }),
-        }
-      );
+      const puzzleRes = await fetch(`${baseUrl}/api/generate-puzzle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ difficulty }),
+      });
       let puzzleData;
       try {
         puzzleData = await puzzleRes.json();
