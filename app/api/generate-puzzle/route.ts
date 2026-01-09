@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { NextRequest, NextResponse } from "next/server";
 import { PuzzleDifficulty } from "@/types/game";
 
@@ -110,7 +112,9 @@ function wordCount(phrase: string) {
   return phrase.split(/\s+/).filter(Boolean).length;
 }
 
-function wordRangeForDifficulty(difficulty: PuzzleDifficulty): [number, number] {
+function wordRangeForDifficulty(
+  difficulty: PuzzleDifficulty
+): [number, number] {
   switch (difficulty) {
     case "easy":
       return [2, 3];
@@ -138,7 +142,8 @@ function parsePuzzle(text: string) {
   if (pipe) {
     const phrase = normalizePhrase(pipe[1]);
     const category = (pipe[2] || "").trim();
-    if (phrase && category && /^[A-Z ]+$/.test(phrase)) return { phrase, category };
+    if (phrase && category && /^[A-Z ]+$/.test(phrase))
+      return { phrase, category };
     return null;
   }
 
@@ -148,7 +153,8 @@ function parsePuzzle(text: string) {
   if (phraseLine && catLine) {
     const phrase = normalizePhrase(phraseLine[1]);
     const category = (catLine[1] || "").trim();
-    if (phrase && category && /^[A-Z ]+$/.test(phrase)) return { phrase, category };
+    if (phrase && category && /^[A-Z ]+$/.test(phrase))
+      return { phrase, category };
     return null;
   }
 
@@ -228,10 +234,14 @@ Generate ONE new puzzle now.
 
     const data = await resp.json();
     const finishReason = data?.candidates?.[0]?.finishReason ?? null;
-    if (finishReason) console.warn("[PUZZLE DEBUG] finishReason:", finishReason);
+    if (finishReason)
+      console.warn("[PUZZLE DEBUG] finishReason:", finishReason);
 
     const parts = data?.candidates?.[0]?.content?.parts ?? [];
-    const text = parts.map((p: any) => p?.text ?? "").join("").trim();
+    const text = parts
+      .map((p: any) => p?.text ?? "")
+      .join("")
+      .trim();
     return { text, finishReason };
   }
 
@@ -266,7 +276,6 @@ RULES:
 - Output ONLY: CATEGORY=<CATEGORY>
 `.trim();
 
-
     const catPrompt = `PHRASE: ${parsed.phrase}`;
 
     const resp = await fetch(
@@ -289,7 +298,10 @@ RULES:
     if (resp.ok) {
       const data = await resp.json();
       const parts = data?.candidates?.[0]?.content?.parts ?? [];
-      const txt = parts.map((p: any) => p?.text ?? "").join("").trim();
+      const txt = parts
+        .map((p: any) => p?.text ?? "")
+        .join("")
+        .trim();
       const m = txt.match(/CATEGORY\s*[:=]\s*(.+)$/i);
       if (m) parsed.category = (m[1] || "").trim();
     }
@@ -328,7 +340,10 @@ RULES:
     if (resp.ok) {
       const data = await resp.json();
       const parts = data?.candidates?.[0]?.content?.parts ?? [];
-      const txt = parts.map((p: any) => p?.text ?? "").join("").trim();
+      const txt = parts
+        .map((p: any) => p?.text ?? "")
+        .join("")
+        .trim();
       const m = txt.match(/PHRASE\s*[:=]\s*(.+)$/i);
       if (m) parsed.phrase = normalizePhrase(m[1]);
     }
@@ -337,37 +352,36 @@ RULES:
   // Final guards
   if (wordCount(parsed.phrase) !== targetWords) return null;
   function isBadCategory(cat: string) {
-  const c = (cat || "").trim();
-  if (!c) return true;
+    const c = (cat || "").trim();
+    if (!c) return true;
 
-  const words = c.split(/\s+/).filter(Boolean);
-  if (words.length < 2) return true;
+    const words = c.split(/\s+/).filter(Boolean);
+    if (words.length < 2) return true;
 
-  // Avoid trivial determiners / truncations
-  const upper = c.toUpperCase();
-  const banned = new Set(["A", "AN", "THE", "OF", "IN", "ON", "TO"]);
-  if (words.length === 1 && banned.has(upper)) return true;
-  if (c.length < 6) return true;
+    // Avoid trivial determiners / truncations
+    const upper = c.toUpperCase();
+    const banned = new Set(["A", "AN", "THE", "OF", "IN", "ON", "TO"]);
+    if (words.length === 1 && banned.has(upper)) return true;
+    if (c.length < 6) return true;
 
-  return false;
-}
+    return false;
+  }
 
-// ... after your category-only salvage and phrase rewrite ...
+  // ... after your category-only salvage and phrase rewrite ...
 
-// Final guards
-if (wordCount(parsed.phrase) !== targetWords) return null;
+  // Final guards
+  if (wordCount(parsed.phrase) !== targetWords) return null;
 
-if (isBadCategory(parsed.category)) {
-  // last-ditch: local fallback category
-  // (better than rejecting a good phrase)
-  parsed.category =
-    difficulty === "hard" || difficulty === "very-hard"
-      ? "Dark Mystery"
-      : "Epic Quest";
-}
+  if (isBadCategory(parsed.category)) {
+    // last-ditch: local fallback category
+    // (better than rejecting a good phrase)
+    parsed.category =
+      difficulty === "hard" || difficulty === "very-hard"
+        ? "Dark Mystery"
+        : "Epic Quest";
+  }
 
-return { phrase: parsed.phrase, category: parsed.category.trim() };
-
+  return { phrase: parsed.phrase, category: parsed.category.trim() };
 }
 
 export async function POST(request: NextRequest) {
