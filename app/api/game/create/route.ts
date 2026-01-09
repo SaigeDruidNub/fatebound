@@ -561,6 +561,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch puzzle from /api/generate-puzzle
     let puzzle;
+    let remoteErrorDebug: any = null;
     try {
       const puzzleRes = await fetch(
         `${
@@ -572,7 +573,18 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({ difficulty }),
         }
       );
-      const puzzleData = await puzzleRes.json();
+      let puzzleData;
+      try {
+        puzzleData = await puzzleRes.json();
+      } catch (jsonErr) {
+        remoteErrorDebug = {
+          source: "remote-json-parse-error",
+          status: puzzleRes.status,
+          statusText: puzzleRes.statusText,
+          error: jsonErr instanceof Error ? jsonErr.message : String(jsonErr),
+        };
+        throw new Error("Failed to parse JSON from /api/generate-puzzle");
+      }
       puzzle = {
         phrase: puzzleData.phrase,
         category: puzzleData.category,
@@ -586,11 +598,22 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       // fallback to local
       puzzle = await generatePuzzle(difficulty as PuzzleDifficulty);
-      if (!("debug" in puzzle)) {
-        (puzzle as any).debug = {
-          source: "local-fallback",
-          note: "Generated locally due to remote error.",
+      // Attach full error details to debug
+      let errorDetails: any = {
+        source: "local-fallback",
+        note: "Generated locally due to remote error.",
+      };
+      if (remoteErrorDebug) {
+        errorDetails.remoteError = remoteErrorDebug;
+      } else if (err) {
+        errorDetails.remoteError = {
+          error: err instanceof Error ? err.message : String(err),
         };
+      }
+      if (!("debug" in puzzle)) {
+        (puzzle as any).debug = errorDetails;
+      } else {
+        (puzzle as any).debug = { ...(puzzle as any).debug, ...errorDetails };
       }
     }
 
