@@ -188,56 +188,63 @@ Respond with ONLY this JSON (no extra text):
 
 Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }],
-          generationConfig: {
-            temperature: 0.6,
-            maxOutputTokens: 500,
-            topP: 0.9,
+    let geminiDebug: Record<string, any> = {};
+    let text = "";
+    let data: any = null;
+    let errorText = "";
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(
-        "❌ Gemini API error in create route:",
-        response.status,
-        errorText
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }],
+            generationConfig: {
+              temperature: 0.6,
+              maxOutputTokens: 500,
+              topP: 0.9,
+            },
+          }),
+        }
       );
-      throw new Error(`Gemini API failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (
-      !data.candidates ||
-      !data.candidates[0] ||
-      !data.candidates[0].content ||
-      !data.candidates[0].content.parts
-    ) {
-      console.error("❌ Unexpected puzzle response structure:", data);
-      throw new Error("Gemini API returned unexpected response structure");
-    }
-
-    const text = data.candidates[0].content.parts[0].text.trim();
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const puzzle = JSON.parse(jsonMatch[0]);
-      return {
-        phrase: puzzle.phrase.toUpperCase(),
-        category: puzzle.category,
-        difficulty,
-      };
+      if (!response.ok) {
+        errorText = await response.text();
+        geminiDebug.error = `Gemini API failed with status ${response.status}`;
+        geminiDebug.errorText = errorText;
+        throw new Error(geminiDebug.error);
+      }
+      data = await response.json();
+      geminiDebug.response = data;
+      if (
+        !data.candidates ||
+        !data.candidates[0] ||
+        !data.candidates[0].content ||
+        !data.candidates[0].content.parts
+      ) {
+        geminiDebug.error = "Gemini API returned unexpected response structure";
+        throw new Error(geminiDebug.error);
+      }
+      text = data.candidates[0].content.parts[0].text.trim();
+      geminiDebug.text = text;
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const puzzle = JSON.parse(jsonMatch[0]);
+        return {
+          phrase: puzzle.phrase.toUpperCase(),
+          category: puzzle.category,
+          difficulty,
+          debug: geminiDebug,
+        };
+      }
+      geminiDebug.error = "No valid JSON puzzle found in Gemini response.";
+    } catch (err) {
+      geminiDebug.exception =
+        typeof err === "object" && err && "message" in err
+          ? (err as any).message
+          : String(err);
     }
 
     // Use a random fallback puzzle for the requested difficulty
