@@ -171,8 +171,9 @@ async function generatePuzzleWithGemini(params: {
   apiKey: string;
   difficulty: PuzzleDifficulty;
   config: DifficultySettings;
+  debugCollector?: (info: any) => void;
 }): Promise<{ phrase: string; category: string } | null> {
-  const { apiKey, difficulty, config } = params;
+  const { apiKey, difficulty, config, debugCollector } = params;
   const [minW, maxW] = wordRangeForDifficulty(difficulty);
   const targetWords = Math.random() < 0.5 ? minW : maxW;
 
@@ -247,19 +248,23 @@ Generate ONE new puzzle now.
 
   // Attempt 1
   const r1 = await callGemini(userPrompt, false);
+  if (debugCollector) debugCollector({ r1 });
   let parsed = parsePuzzle(r1.text);
 
   // Attempt 2: repair
   if (!parsed || !parsed.phrase) {
+    if (debugCollector) debugCollector({ r1_invalid: r1.text });
     console.warn(`[PUZZLE DEBUG] Attempt 1 not valid, raw:`, r1.text);
     const repairPrompt =
       userPrompt +
       `\n\nREPAIR: Output only the PHRASE and CATEGORY in the required format. No extra words.`;
 
     const r2 = await callGemini(repairPrompt, true);
+    if (debugCollector) debugCollector({ r2 });
     parsed = parsePuzzle(r2.text);
 
     if (!parsed) {
+      if (debugCollector) debugCollector({ r2_invalid: r2.text });
       console.warn(`[PUZZLE DEBUG] Attempt 2 not valid, raw:`, r2.text);
       return null;
     }
@@ -404,11 +409,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const puzzle = await generatePuzzleWithGemini({
-      apiKey,
-      difficulty,
-      config,
-    });
+    let geminiDebug = {};
+    let puzzle = null;
+    try {
+      puzzle = await generatePuzzleWithGemini({
+        apiKey,
+        difficulty,
+        config,
+        debugCollector: (info) => {
+          geminiDebug = { ...geminiDebug, ...info };
+        },
+      });
+    } catch (e) {
+      geminiDebug.error = e?.message || String(e);
+    }
 
     if (!puzzle) {
       const fb = pickFallback(difficulty);
@@ -425,7 +439,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...puzzle,
       difficulty,
-      debug: { source: "gemini" },
+      debug: { source: "gemini", gemini: geminiDebug },
     });
   } catch (error) {
     console.error(`[PUZZLE DEBUG] Internal server error:`, error);
