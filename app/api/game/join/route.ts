@@ -9,7 +9,16 @@ function generatePlayerId(): string {
 export async function POST(request: NextRequest) {
   try {
     const { gameId, playerName } = await request.json();
-
+    if (
+      !playerName ||
+      typeof playerName !== "string" ||
+      playerName.length > 20
+    ) {
+      return NextResponse.json(
+        { error: "Player name must be 1-20 characters." },
+        { status: 400 }
+      );
+    }
 
     const gameState = await getGame(gameId);
 
@@ -40,7 +49,6 @@ export async function POST(request: NextRequest) {
 
     gameState.players.push(player);
     await setGame(gameId, gameState);
-
 
     return NextResponse.json({
       playerId,

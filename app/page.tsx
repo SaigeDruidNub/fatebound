@@ -681,9 +681,10 @@ export default function Home() {
                 <input
                   type="text"
                   value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
+                  maxLength={20}
+                  onChange={(e) => setPlayerName(e.target.value.slice(0, 20))}
                   className="w-full rounded-lg bg-[#305853] p-3 text-white border border-[#B06821] focus:outline-none focus:ring-2 focus:ring-[#B06821]"
-                  placeholder="Enter your name"
+                  placeholder="Enter your name (max 20 chars)"
                 />
               </div>
 

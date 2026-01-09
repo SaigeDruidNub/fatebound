@@ -7,7 +7,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { playerName, score, difficulty, gameId } = body;
 
-    if (!playerName || typeof score !== "number" || !difficulty || !gameId) {
+    if (
+      !playerName ||
+      typeof playerName !== "string" ||
+      playerName.length > 20
+    ) {
+      return NextResponse.json(
+        { error: "Player name must be 1-20 characters." },
+        { status: 400 }
+      );
+    }
+    if (typeof score !== "number" || !difficulty || !gameId) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
