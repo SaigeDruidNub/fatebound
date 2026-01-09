@@ -568,12 +568,21 @@ export async function POST(request: NextRequest) {
         phrase: puzzleData.phrase,
         category: puzzleData.category,
         difficulty: puzzleData.difficulty,
-        debug: puzzleData.debug,
+        debug: puzzleData.debug ?? {
+          source: "remote",
+          note: "No debug field from remote.",
+        },
         test: puzzleData.test,
       };
     } catch (err) {
       // fallback to local
       puzzle = await generatePuzzle(difficulty as PuzzleDifficulty);
+      if (!puzzle.debug) {
+        puzzle.debug = {
+          source: "local-fallback",
+          note: "Generated locally due to remote error.",
+        };
+      }
     }
 
     const scenario = await generateScenario();
@@ -597,6 +606,7 @@ export async function POST(request: NextRequest) {
         category: puzzle.category,
         revealedLetters: new Set(),
         difficulty: puzzle.difficulty || (difficulty as PuzzleDifficulty),
+        debug: puzzle.debug,
       },
       selectedLetters: [],
       currentScenario: scenario,
