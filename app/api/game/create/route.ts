@@ -577,8 +577,8 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       // fallback to local
       puzzle = await generatePuzzle(difficulty as PuzzleDifficulty);
-      if (!puzzle.debug) {
-        puzzle.debug = {
+      if (!("debug" in puzzle)) {
+        (puzzle as any).debug = {
           source: "local-fallback",
           note: "Generated locally due to remote error.",
         };
