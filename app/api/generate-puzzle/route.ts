@@ -220,38 +220,65 @@ Generate ONE new puzzle now.
 `.trim();
 
   async function callGemini(promptText: string, retry: boolean) {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ role: "user", parts: [{ text: promptText }] }],
-          generationConfig: {
-            temperature: retry ? 0.2 : 0.35,
-            topP: 0.9,
-            maxOutputTokens: 220,
-            // IMPORTANT: do NOT stop on "\n" or you'll cut off the CATEGORY line
-            // stopSequences: ["\n\n\n"], // optional, usually not needed
-          },
-        }),
+    let debug: any = { sentPrompt: promptText, retry };
+    let resp: Response | null = null;
+    let data: any = null;
+    try {
+      resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemInstruction }] },
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            generationConfig: {
+              temperature: retry ? 0.2 : 0.35,
+              topP: 0.9,
+              maxOutputTokens: 220,
+              // IMPORTANT: do NOT stop on "\n" or you'll cut off the CATEGORY line
+              // stopSequences: ["\n\n\n"], // optional, usually not needed
+            },
+          }),
+        }
+      );
+      debug.status = resp.status;
+      debug.statusText = resp.statusText;
+      if (!resp.ok) {
+        debug.error = `HTTP ${resp.status} ${resp.statusText}`;
+        try {
+          debug.responseBody = await resp.text();
+        } catch (e) {
+          debug.responseBody = `Failed to read response body: ${e}`;
+        }
+        if (debugCollector) debugCollector({ geminiHttpError: debug });
+        return { text: "", finishReason: null as any };
       }
-    );
+      data = await resp.json();
+      debug.responseData = data;
+      const finishReason = data?.candidates?.[0]?.finishReason ?? null;
+      if (finishReason)
+        console.warn("[PUZZLE DEBUG] finishReason:", finishReason);
 
-    if (!resp.ok) return { text: "", finishReason: null as any };
-
-    const data = await resp.json();
-    const finishReason = data?.candidates?.[0]?.finishReason ?? null;
-    if (finishReason)
-      console.warn("[PUZZLE DEBUG] finishReason:", finishReason);
-
-    const parts = data?.candidates?.[0]?.content?.parts ?? [];
-    const text = parts
-      .map((p: any) => p?.text ?? "")
-      .join("")
-      .trim();
-    return { text, finishReason };
+      const parts = data?.candidates?.[0]?.content?.parts ?? [];
+      const text = parts
+        .map((p: any) => p?.text ?? "")
+        .join("")
+        .trim();
+      if (debugCollector) debugCollector({ geminiCall: debug });
+      return { text, finishReason };
+    } catch (err) {
+      debug.error = err instanceof Error ? err.message : String(err);
+      if (resp && !data) {
+        try {
+          debug.responseBody = await resp.text();
+        } catch (e) {
+          debug.responseBody = `Failed to read response body: ${e}`;
+        }
+      }
+      if (debugCollector) debugCollector({ geminiException: debug });
+      return { text: "", finishReason: null as any };
+    }
   }
 
   // Attempt 1
