@@ -405,7 +405,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ...fb,
         difficulty,
-        debug: { source: "fallback" },
+        debug: {
+          source: "fallback",
+          requestBody: body,
+          resolvedDifficulty: difficulty,
+        },
       });
     }
 
@@ -433,7 +437,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ...fb,
         difficulty,
-        debug: { source: "fallback_after_ai_failed" },
+        debug: {
+          source: "fallback_after_ai_failed",
+          gemini: geminiDebug,
+          requestBody: body,
+          resolvedDifficulty: difficulty,
+        },
       });
     }
 
@@ -442,7 +451,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...puzzle,
       difficulty,
-      debug: { source: "gemini", gemini: geminiDebug },
+      debug: {
+        source: "gemini",
+        gemini: geminiDebug,
+        requestBody: body,
+        resolvedDifficulty: difficulty,
+      },
     });
   } catch (error) {
     console.error(`[PUZZLE DEBUG] Internal server error:`, error);
