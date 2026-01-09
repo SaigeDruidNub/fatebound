@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGame, setGame } from "@/lib/gameStore";
 import { GameState, Player, PuzzleDifficulty } from "@/types/game";
 
+// Extend the puzzle type to allow debug for troubleshooting
+type GamePuzzleWithDebug = {
+  phrase: string;
+  category: string;
+  revealedLetters: Set<string>;
+  difficulty: PuzzleDifficulty;
+  debug?: any;
+};
+
 function generateGameId(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
@@ -596,7 +605,16 @@ export async function POST(request: NextRequest) {
       isBot: false,
     };
 
-    const gameState: GameState = {
+    // Ensure debug is always present
+    if (!("debug" in puzzle)) {
+      (puzzle as any).debug = {
+        source: "unknown",
+        note: "No debug info present on puzzle object.",
+      };
+    }
+    const gameState: Omit<GameState, "puzzle"> & {
+      puzzle: GamePuzzleWithDebug;
+    } = {
       id: gameId,
       players: [player],
       currentPlayerIndex: 0,
@@ -606,7 +624,7 @@ export async function POST(request: NextRequest) {
         category: puzzle.category,
         revealedLetters: new Set(),
         difficulty: puzzle.difficulty || (difficulty as PuzzleDifficulty),
-        debug: puzzle.debug,
+        debug: (puzzle as any).debug,
       },
       selectedLetters: [],
       currentScenario: scenario,
