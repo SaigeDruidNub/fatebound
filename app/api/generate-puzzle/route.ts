@@ -409,7 +409,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let geminiDebug = {};
+    let geminiDebug: Record<string, any> = {};
     let puzzle = null;
     try {
       puzzle = await generatePuzzleWithGemini({
@@ -421,7 +421,10 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (e) {
-      geminiDebug.error = e?.message || String(e);
+      geminiDebug.error =
+        typeof e === "object" && e && "message" in e
+          ? (e as any).message
+          : String(e);
     }
 
     if (!puzzle) {
