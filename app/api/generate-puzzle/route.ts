@@ -97,6 +97,14 @@ const FALLBACK_PUZZLES: Record<
 
 function pickFallback(difficulty: PuzzleDifficulty) {
   const puzzles = FALLBACK_PUZZLES[difficulty];
+  // Use crypto for better randomness in serverless
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    const array = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(array);
+    const idx = array[0] % puzzles.length;
+    return puzzles[idx];
+  }
+  // Fallback to Math.random if crypto is unavailable
   return puzzles[Math.floor(Math.random() * puzzles.length)];
 }
 

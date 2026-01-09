@@ -240,11 +240,78 @@ Make it UNIQUE and EXCITING at ${difficulty} difficulty!`;
       };
     }
 
-    return {
-      phrase: "GUARDIAN OF THE RUINS",
-      category: "Mythic Protector",
-      difficulty,
+    // Use a random fallback puzzle for the requested difficulty
+    const fallbackPuzzles: Record<
+      PuzzleDifficulty,
+      Array<{ phrase: string; category: string; difficulty: PuzzleDifficulty }>
+    > = {
+      easy: [
+        {
+          phrase: "MAGIC SWORD",
+          category: "Legendary Weapon",
+          difficulty: "easy",
+        },
+        {
+          phrase: "DRAGON SLAYER",
+          category: "Heroic Title",
+          difficulty: "easy",
+        },
+        { phrase: "DARK FOREST", category: "Spooky Place", difficulty: "easy" },
+      ],
+      medium: [
+        {
+          phrase: "THE TREASURE IS CURSED",
+          category: "Adventure Warning",
+          difficulty: "medium",
+        },
+        {
+          phrase: "GUARDIAN OF THE RUINS",
+          category: "Mythic Title",
+          difficulty: "medium",
+        },
+        {
+          phrase: "SWORD IN THE STONE",
+          category: "Legendary Artifact",
+          difficulty: "medium",
+        },
+      ],
+      hard: [
+        {
+          phrase: "SHADOW OF THE FORGOTTEN KING",
+          category: "Dark Legacy",
+          difficulty: "hard",
+        },
+        {
+          phrase: "KEEPER OF THE SACRED FLAME",
+          category: "Holy Guardian",
+          difficulty: "hard",
+        },
+        {
+          phrase: "PROPHECY OF THE CRIMSON MOON",
+          category: "Dark Omen",
+          difficulty: "hard",
+        },
+      ],
+      "very-hard": [
+        {
+          phrase: "CHRONICLE OF THE FALLEN EMPIRE STATE",
+          category: "Ancient History",
+          difficulty: "very-hard",
+        },
+        {
+          phrase: "KEEPER OF THE FORBIDDEN ARCANE KNOWLEDGE",
+          category: "Mystic Secret",
+          difficulty: "very-hard",
+        },
+        {
+          phrase: "LEGEND OF THE ETERNAL TWILIGHT REALM",
+          category: "Mythic Dimension",
+          difficulty: "very-hard",
+        },
+      ],
     };
+    const puzzles = fallbackPuzzles[difficulty];
+    return puzzles[Math.floor(Math.random() * puzzles.length)];
   } catch (error) {
     console.error("Error generating puzzle in create route:", error);
     // Fallback puzzles organized by difficulty
