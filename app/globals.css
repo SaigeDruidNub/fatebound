@@ -3,6 +3,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary: #7A4900; /* Accessible dark gold */
+  --primary-dark: #4E342E; /* Even darker for hover/active */
 }
 
 @theme inline {
@@ -16,6 +18,8 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --primary: #7A4900; /* Accessible dark gold for both modes */
+    --primary-dark: #4E342E; /* Even darker for hover/active */
   }
 }
 

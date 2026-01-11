@@ -550,9 +550,19 @@ Respond ONLY with valid JSON.`;
     );
 
     if (!response.ok) {
+      // Creative fallback outcomes
+      const fallbackOutcomes = [
+        "Fate hangs in the balance. The result is shrouded in mystery.",
+        "The world seems to pause, unsure of what comes next.",
+        "Your action sets events in motion, but the consequences remain unclear.",
+        "A tense silence follows—no one can say for sure what will happen.",
+        "Destiny wavers; the outcome is left to chance.",
+        "The air crackles with uncertainty. Only time will tell the result.",
+      ];
       return {
         success: Math.random() > 0.4,
-        outcome: "The outcome is uncertain.",
+        outcome:
+          fallbackOutcomes[Math.floor(Math.random() * fallbackOutcomes.length)],
       };
     }
 

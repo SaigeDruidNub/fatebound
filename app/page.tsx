@@ -700,10 +700,10 @@ export default function Home() {
                       onClick={() =>
                         setPuzzleDifficulty(diff as PuzzleDifficulty)
                       }
-                      className={`rounded-lg px-4 py-3 font-semibold text-white transition-colors ${
+                      className={`rounded-lg px-4 py-3 font-semibold text-white transition-colors bg-[#305853] border-4 ${
                         puzzleDifficulty === diff
-                          ? "bg-[#B06821] ring-2 ring-[#B06821]"
-                          : "bg-[#305853] hover:bg-[#B06821]/50"
+                          ? "border-[var(--primary)]"
+                          : "border-transparent"
                       }`}
                     >
                       {diff === "very-hard"
@@ -753,7 +753,7 @@ export default function Home() {
               <button
                 onClick={joinGame}
                 disabled={loading}
-                className="w-full rounded-lg bg-[#B06821] px-6 py-4 font-semibold text-white transition-colors hover:bg-[#9E2C21] disabled:bg-[#1B2A30] text-base sm:text-lg"
+                className="w-full rounded-lg bg-[var(--primary)] px-6 py-4 font-semibold text-white transition-colors hover:bg-[var(--primary-dark)] disabled:bg-[#1B2A30] text-base sm:text-lg"
               >
                 Join Game
               </button>
