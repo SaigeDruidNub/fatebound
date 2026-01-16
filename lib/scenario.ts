@@ -16,7 +16,7 @@ export async function generateScenario(recentScenarios: string[] = []) {
 
   const pickFallback = () => {
     const available = fallbackScenarios.filter(
-      (s) => !recentScenarios.includes(s)
+      (s) => !recentScenarios.includes(s),
     );
     const choices = available.length > 0 ? available : fallbackScenarios;
     return choices[Math.floor(Math.random() * choices.length)];
@@ -25,6 +25,7 @@ export async function generateScenario(recentScenarios: string[] = []) {
   if (!apiKey) return pickFallback();
 
   // --- helpers to salvage partial outputs ---
+
   const clean = (t: string) =>
     (t || "")
       .replace(/\r/g, "")
@@ -32,17 +33,24 @@ export async function generateScenario(recentScenarios: string[] = []) {
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
+  // Appends 'What do you do?' only if not already present (case-insensitive, ignores trailing punctuation/whitespace)
+  function appendWhatDoYouDoOnce(text: string): string {
+    const cleaned = clean(text);
+    // Regex: ends with 'what do you do' (case-insensitive), optional punctuation, optional whitespace
+    if (/what do you do[.?!"']*\s*$/i.test(cleaned)) {
+      return cleaned.replace(/([.?!"']*)\s*$/i, "?"); // Normalize ending to '?'
+    }
+    return cleaned.replace(/[.?!"']*\s*$/, "") + ". What do you do?";
+  }
+
   const ensureEnding = (t: string) => {
     const trimmed = clean(t);
-    const idx = trimmed.indexOf("What do you do?");
-    if (idx !== -1) return trimmed.slice(0, idx + "What do you do?".length);
     const sentences = trimmed.split(/(?<=[.!?])\s+/).filter(Boolean);
     if (sentences.length < 2) {
       return "";
     }
     const base = sentences.slice(0, 2).join(" ");
-    const noTrailingPunct = base.replace(/[.!?]+\s*$/, "");
-    return `${noTrailingPunct}. What do you do?`;
+    return appendWhatDoYouDoOnce(base);
   };
 
   const systemInstruction = `
@@ -87,7 +95,7 @@ ${recentBlock}
             stopSequences: ["What do you do?"],
           },
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -101,9 +109,7 @@ ${recentBlock}
       .map((p: any) => p?.text ?? "")
       .join("")
       .trim();
-    const scenario = ensureEnding(
-      rawText ? rawText + " What do you do?" : rawText
-    );
+    const scenario = ensureEnding(rawText);
     if (!scenario || scenario.length < 30) {
       return pickFallback();
     }
