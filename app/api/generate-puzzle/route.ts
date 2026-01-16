@@ -121,7 +121,7 @@ function wordCount(phrase: string) {
 }
 
 function wordRangeForDifficulty(
-  difficulty: PuzzleDifficulty
+  difficulty: PuzzleDifficulty,
 ): [number, number] {
   switch (difficulty) {
     case "easy":
@@ -205,6 +205,9 @@ RULES FOR PHRASE:
 
 RULES FOR CATEGORY:
 - 2 to 4 words, short adventure-related label
+- MUST be specific, creative, and fit the phrase
+- DO NOT use generic categories like "Epic Quest", "Adventure", "Fantasy", or "Quest"
+- Use more descriptive, imaginative, or scenario-specific labels (e.g. "Cursed Relic", "Forbidden Ritual", "Ancient Prophecy", "Monster Alert", "Lost Civilization", "Heroic Title", "Spooky Place")
 
 DO NOT add extra commentary. Do NOT say "Here is...". Do NOT mention JSON.
 `.trim();
@@ -235,12 +238,12 @@ Generate ONE new puzzle now.
             generationConfig: {
               temperature: retry ? 0.2 : 0.35,
               topP: 0.9,
-              maxOutputTokens: 220,
+              maxOutputTokens: 350,
               // IMPORTANT: do NOT stop on "\n" or you'll cut off the CATEGORY line
               // stopSequences: ["\n\n\n"], // optional, usually not needed
             },
           }),
-        }
+        },
       );
       debug.status = resp.status;
       debug.statusText = resp.statusText;
@@ -332,7 +335,7 @@ RULES:
             maxOutputTokens: 60,
           },
         }),
-      }
+      },
     );
 
     if (resp.ok) {
@@ -374,7 +377,7 @@ RULES:
             maxOutputTokens: 500,
           },
         }),
-      }
+      },
     );
 
     if (resp.ok) {
@@ -497,7 +500,7 @@ export async function POST(request: NextRequest) {
     console.error(`[PUZZLE DEBUG] Internal server error:`, error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
