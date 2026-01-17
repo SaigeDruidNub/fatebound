@@ -308,46 +308,89 @@ Generate ONE new puzzle now.
     }
   }
 
-  // If we got phrase but missing category, ask category-only
-  if (parsed.category.trim() === "") {
-    const catSystem = `
+  // If we got phrase but missing or banned category, ask category-only (with retry for banned)
+  const bannedCategories = ["Epic Quest", "Adventure", "Fantasy", "Quest"];
+  function isBannedCategory(cat: string) {
+    return bannedCategories.some(
+      (b) => cat.trim().toLowerCase() === b.toLowerCase(),
+    );
+  }
+
+  async function fetchCategory(phrase: string) {
+ const catSystem = `
 Create a category label for a fantasy Wheel-of-Fortune puzzle.
 
-RULES:
+OUTPUT FORMAT (exact):
+CATEGORY=<CATEGORY>###
+
+CATEGORY RULES:
 - EXACTLY 2 to 4 words
-- Avoid single words like "AN" or "THE"
-- Output ONLY: CATEGORY=<CATEGORY>
+- Category should describe the *TYPE* (broad class), not a rewording of the phrase
+- DO NOT paraphrase or synonym-swap the phrase’s nouns (e.g. do not turn "CAVE ENTRANCE" into "MOUNTAIN PASSAGEWAY")
+- Avoid overly literal/location-feature labels (Terrain Feature, Hidden Passageway, Concealed Feature)
+- Choose from category styles like: Spooky Place, Secret Route, Ancient Ruins, Arcane Relic, Monster Threat, Dark Prophecy, Heroic Title, Cursed Object, Dangerous Mission
+
+BANNED GENERIC:
+- Epic Quest, Adventure, Fantasy, Quest
+
+Output ONLY the format above. No extra text.
 `.trim();
 
-    const catPrompt = `PHRASE: ${parsed.phrase}`;
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: catSystem }] },
-          contents: [{ role: "user", parts: [{ text: catPrompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            topP: 0.9,
-            maxOutputTokens: 60,
-          },
-        }),
-      },
-    );
+  const catPrompt = `PHRASE: ${phrase}`;
 
-    if (resp.ok) {
-      const data = await resp.json();
-      const parts = data?.candidates?.[0]?.content?.parts ?? [];
-      const txt = parts
-        .map((p: any) => p?.text ?? "")
-        .join("")
-        .trim();
-      const m = txt.match(/CATEGORY\s*[:=]\s*(.+)$/i);
-      if (m) parsed.category = (m[1] || "").trim();
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: catSystem }] },
+        contents: [{ role: "user", parts: [{ text: catPrompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.9,
+          maxOutputTokens: 280,
+          stopSequences: ["###"], // HARD STOP so it can’t ramble
+        },
+      }),
     }
+  );
+
+  if (!resp.ok) return "";
+
+  const data = await resp.json();
+  const finishReason = data?.candidates?.[0]?.finishReason;
+  console.log("[PUZZLE DEBUG] category finishReason:", finishReason);
+
+  const parts = data?.candidates?.[0]?.content?.parts ?? [];
+  const txt = parts.map((p: any) => p?.text ?? "").join("").trim();
+
+  console.log(`[PUZZLE DEBUG] Raw category AI output:`, txt);
+
+  const m = txt.match(/CATEGORY\s*[:=]\s*([A-Za-z][A-Za-z ]{2,60})/i);
+  if (!m) return "";
+
+  const category = (m[1] || "").trim().replace(/\s+/g, " ");
+  const wc = category.split(/\s+/).filter(Boolean).length;
+  if (wc < 2 || wc > 4) return "";
+
+  const upper = category.toUpperCase();
+  const banned = ["EPIC QUEST", "ADVENTURE", "FANTASY", "QUEST"];
+  if (banned.includes(upper)) return "";
+
+  return category;
+}
+
+
+
+  if (parsed.category.trim() === "" || isBannedCategory(parsed.category)) {
+    let newCat = await fetchCategory(parsed.phrase);
+    if (isBannedCategory(newCat)) {
+      // Retry once with extra warning
+      newCat = await fetchCategory(parsed.phrase);
+    }
+    if (newCat && !isBannedCategory(newCat)) parsed.category = newCat;
   }
 
   // Word count validation + rewrite salvage if needed
@@ -415,17 +458,72 @@ RULES:
   // Final guards
   if (wordCount(parsed.phrase) !== targetWords) return null;
 
-  if (isBadCategory(parsed.category)) {
-    // last-ditch: local fallback category
-    // (better than rejecting a good phrase)
-    parsed.category =
-      difficulty === "hard" || difficulty === "very-hard"
-        ? "Dark Mystery"
-        : "Epic Quest";
-  }
+  if (
+  isBadCategory(parsed.category) ||
+  isGenericCategory(parsed.category) ||
+  looksTruncatedCategory(parsed.category)
+) {
+  const aiCat = await fetchCategory(parsed.phrase);
+  parsed.category = (!isBadCategory(aiCat) && !isGenericCategory(aiCat))
+    ? aiCat
+    : fallbackCategoryFromPhrase(parsed.phrase);
+}
+
+
 
   return { phrase: parsed.phrase, category: parsed.category.trim() };
 }
+
+function fallbackCategoryFromPhrase(phrase: string): string {
+  const p = phrase.toUpperCase();
+
+  // Weapons / gear
+  if (/\b(SWORD|DAGGER|AXE|BOW|SPEAR|HAMMER)\b/.test(p)) return "Legendary Weapon";
+  if (/\b(STAFF|WAND|ORB|TOME|GRIMOIRE)\b/.test(p)) return "Arcane Relic";
+  if (/\b(SHIELD|ARMOR|HELM|GAUNTLET)\b/.test(p)) return "Ancient Gear";
+
+  // Magic / curses / prophecy
+  if (/\b(CURSE|Cursed|HEX|DOOM|BANE)\b/.test(p)) return "Dark Curse";
+  if (/\b(PROPHECY|OMEN|FATE|DESTINY)\b/.test(p)) return "Ancient Prophecy";
+  if (/\b(RITUAL|SPELL|INCANTATION)\b/.test(p)) return "Forbidden Ritual";
+
+  // Places
+  if (/\b(CRYPT|TOMB|CATACOMB)\b/.test(p)) return "Haunted Ruins";
+  if (/\b(CASTLE|FORTRESS|CITADEL|TOWER)\b/.test(p)) return "Dangerous Location";
+  if (/\b(FOREST|SWAMP|CAVERN|MOUNTAIN)\b/.test(p)) return "Wild Territory";
+
+  // Creatures
+  if (/\b(DRAGON|WYVERN|BEAST|DEMON|GHOUL|WRAITH)\b/.test(p)) return "Monster Threat";
+
+  // Default that’s still non-generic
+  return "Hidden Mystery";
+}
+
+function isGenericCategory(cat: string) {
+  const upper = (cat || "").trim().toUpperCase();
+  const banned = ["EPIC QUEST", "ADVENTURE", "FANTASY", "QUEST"];
+  return banned.includes(upper);
+}
+
+function looksTruncatedCategory(cat: string) {
+  const c = (cat || "").trim();
+  if (!c) return true;
+
+  // Too short or too few words
+  const words = c.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return true;
+  if (c.length < 8) return true;
+
+  // Last word suspiciously short (common truncation)
+  const last = words[words.length - 1];
+  if (last.length <= 2) return true;
+
+  // Ends with incomplete-looking fragment
+  if (/[A-Z]{1,2}$/.test(c)) return true; // "AR", "AN", etc.
+
+  return false;
+}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -433,7 +531,7 @@ export async function POST(request: NextRequest) {
     const difficulty: PuzzleDifficulty = body.difficulty || "medium";
     const config = DIFFICULTY_CONFIG[difficulty];
 
-    console.log(`[PUZZLE DEBUG] Requested difficulty: hard`);
+    console.log(`[PUZZLE DEBUG] Requested difficulty: ${difficulty}`);
 
     const apiKey = process.env.GEMINI_API_KEY;
 
