@@ -238,7 +238,7 @@ Generate ONE new puzzle now.
             generationConfig: {
               temperature: retry ? 0.2 : 0.35,
               topP: 0.9,
-              maxOutputTokens: 350,
+              maxOutputTokens: 500,
               // IMPORTANT: do NOT stop on "\n" or you'll cut off the CATEGORY line
               // stopSequences: ["\n\n\n"], // optional, usually not needed
             },
@@ -350,7 +350,7 @@ Output ONLY the format above. No extra text.
         generationConfig: {
           temperature: 0.3,
           topP: 0.9,
-          maxOutputTokens: 280,
+          maxOutputTokens: 500,
           stopSequences: ["###"], // HARD STOP so it can’t ramble
         },
       }),

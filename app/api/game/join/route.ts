@@ -8,7 +8,7 @@ function generatePlayerId(): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { gameId, playerName } = await request.json();
+    const { gameId, playerName, canSeeOthers } = await request.json();
     if (
       !playerName ||
       typeof playerName !== "string" ||
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Player name must be 1-20 characters." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
 
     if (gameState.phase !== "lobby") {
       console.error(
-        `❌ Game ${gameId} already started (phase: ${gameState.phase})`
+        `❌ Game ${gameId} already started (phase: ${gameState.phase})`,
       );
       return NextResponse.json(
         { error: "Game already started" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       lives: 3,
       score: 0,
       isBot: false,
+      canSeeOthers: canSeeOthers === false ? false : true,
     };
 
     gameState.players.push(player);

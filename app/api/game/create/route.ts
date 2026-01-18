@@ -36,7 +36,7 @@ async function generateScenario(recentScenarios: string[] = []) {
     ];
 
     const available = fallbackScenarios.filter(
-      (s) => !recentScenarios.includes(s)
+      (s) => !recentScenarios.includes(s),
     );
     const choices = available.length > 0 ? available : fallbackScenarios;
     return choices[Math.floor(Math.random() * choices.length)];
@@ -110,7 +110,7 @@ Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
             topP: 0.95,
           },
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -158,7 +158,7 @@ Write ONE new scenario that is UNIQUE and DIFFERENT from anything above:`;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { playerName, difficulty = "medium" } = body;
+    const { playerName, difficulty = "medium", canSeeOthers } = body;
     if (
       !playerName ||
       typeof playerName !== "string" ||
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Player name must be 1-20 characters." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -176,13 +176,16 @@ export async function POST(request: NextRequest) {
     // Fetch puzzle from /api/generate-puzzle
     let puzzle;
     let remoteErrorDebug: any = null;
-        
+
     try {
-      const puzzleRes = await fetch(new URL("/api/generate-puzzle", request.url), {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ difficulty }),
-});
+      const puzzleRes = await fetch(
+        new URL("/api/generate-puzzle", request.url),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ difficulty }),
+        },
+      );
 
       let puzzleData;
       try {
@@ -215,7 +218,7 @@ export async function POST(request: NextRequest) {
             remoteErrorDebug ||
             (err instanceof Error ? err.message : String(err)),
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -228,6 +231,7 @@ export async function POST(request: NextRequest) {
       lives: 3,
       score: 0,
       isBot: false,
+      canSeeOthers: canSeeOthers === false ? false : true,
     };
 
     // Ensure debug is always present
@@ -270,7 +274,7 @@ export async function POST(request: NextRequest) {
     console.error("Error creating game:", error);
     return NextResponse.json(
       { error: "Failed to create game" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

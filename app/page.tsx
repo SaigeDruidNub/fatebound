@@ -20,6 +20,11 @@ type GameState = {
   currentScenario: string;
   roundNumber: number;
   winner: string | null;
+  actionLog: {
+    playerId: string;
+    action: string;
+    outcome: string;
+  }[];
 };
 
 export default function Home() {
@@ -42,6 +47,7 @@ export default function Home() {
   >("all");
   const [puzzleDifficulty, setPuzzleDifficulty] =
     useState<PuzzleDifficulty>("medium");
+  const [canSeeOthers, setCanSeeOthers] = useState<boolean>(true); // New: toggle for see others
   const botActionInProgress = useRef(false);
   const leaderboardSubmitted = useRef(false);
 
@@ -90,7 +96,11 @@ export default function Home() {
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/game/${gameId}`);
+        // Pass playerId to backend so it can filter actionLog if needed
+        const url = playerId
+          ? `/api/game/${gameId}?playerId=${playerId}`
+          : `/api/game/${gameId}`;
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           setGameState(data);
@@ -101,7 +111,40 @@ export default function Home() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [gameId, gameState?.phase]);
+  }, [gameId, gameState?.phase, playerId]);
+  // Show action log if allowed
+  const renderActionLog = () => {
+    if (!gameState || !Array.isArray(gameState.actionLog)) return null;
+    const me = gameState.players.find((p) => p.id === playerId);
+    // If canSeeOthers is false, only show own actions (already filtered by backend)
+    // If canSeeOthers is true, show all actions
+    if (me && me.canSeeOthers === false && gameState.actionLog.length === 0) {
+      return (
+        <div className="text-white text-sm mb-2">No actions to show yet.</div>
+      );
+    }
+    return (
+      <div className="bg-[#1B2A30]/60 p-4 rounded-lg mb-4 border border-[#305853]">
+        <div className="text-[#B06821] font-bold mb-2">Action Log</div>
+        <ul className="space-y-1">
+          {gameState.actionLog.map((entry, idx) => {
+            const player = gameState.players.find(
+              (p) => p.id === entry.playerId,
+            );
+            return (
+              <li key={idx} className="text-white text-xs">
+                <span className="font-semibold">
+                  {player ? player.name : entry.playerId}:
+                </span>{" "}
+                {entry.action}{" "}
+                <span className="text-[#B06821]">({entry.outcome})</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  };
 
   // Auto-play bot turns
   useEffect(() => {
@@ -115,40 +158,43 @@ export default function Home() {
       botActionInProgress.current = true;
       setBotThinking(true);
 
-      setTimeout(async () => {
-        try {
-          const response = await fetch("/api/game/bot-action", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ gameId }),
-          });
+      setTimeout(
+        async () => {
+          try {
+            const response = await fetch("/api/game/bot-action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ gameId }),
+            });
 
-          const data = await response.json();
+            const data = await response.json();
 
-          if (data.error) {
-            console.error("Bot action error:", data.error);
+            if (data.error) {
+              console.error("Bot action error:", data.error);
+              setBotThinking(false);
+              botActionInProgress.current = false;
+              return;
+            }
+
+            setGameState(data.gameState);
+
+            if (data.outcome) {
+              setLastOutcome(data.outcome);
+            }
+            if (data.message) {
+              setMessage(
+                `${currentPlayer.name} ${data.botAction}: ${data.message}`,
+              );
+            }
+          } catch (error) {
+            console.error("Error processing bot action:", error);
+          } finally {
             setBotThinking(false);
             botActionInProgress.current = false;
-            return;
           }
-
-          setGameState(data.gameState);
-
-          if (data.outcome) {
-            setLastOutcome(data.outcome);
-          }
-          if (data.message) {
-            setMessage(
-              `${currentPlayer.name} ${data.botAction}: ${data.message}`
-            );
-          }
-        } catch (error) {
-          console.error("Error processing bot action:", error);
-        } finally {
-          setBotThinking(false);
-          botActionInProgress.current = false;
-        }
-      }, 1500 + Math.random() * 1000);
+        },
+        1500 + Math.random() * 1000,
+      );
 
       return;
     }
@@ -158,79 +204,82 @@ export default function Home() {
       botActionInProgress.current = true;
       setBotThinking(true);
 
-      setTimeout(async () => {
-        try {
-          // Use common English letter frequency for bot guesses
-          const commonLetters = [
-            "E",
-            "A",
-            "R",
-            "I",
-            "O",
-            "T",
-            "N",
-            "S",
-            "L",
-            "C",
-            "U",
-            "D",
-            "P",
-            "M",
-            "H",
-            "G",
-            "B",
-            "F",
-            "Y",
-            "W",
-            "K",
-            "V",
-            "X",
-            "Z",
-            "J",
-            "Q",
-          ];
-          const guessed = new Set([
-            ...(gameState.puzzle.revealedLetters || []),
-            ...(gameState.selectedLetters || []),
-          ]);
-          let chosenLetter = null;
-          for (const l of commonLetters) {
-            if (!guessed.has(l)) {
-              chosenLetter = l;
-              break;
-            }
-          }
-          if (chosenLetter) {
-            const response = await fetch("/api/game/letter", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                gameId,
-                playerId: currentPlayer.id,
-                letter: chosenLetter,
-              }),
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-              console.error("Bot letter error:", data.error);
-            } else {
-              setGameState(data.gameState);
-              if (data.message) {
-                setMessage(
-                  `${currentPlayer.name} guesses ${chosenLetter}: ${data.message}`
-                );
+      setTimeout(
+        async () => {
+          try {
+            // Use common English letter frequency for bot guesses
+            const commonLetters = [
+              "E",
+              "A",
+              "R",
+              "I",
+              "O",
+              "T",
+              "N",
+              "S",
+              "L",
+              "C",
+              "U",
+              "D",
+              "P",
+              "M",
+              "H",
+              "G",
+              "B",
+              "F",
+              "Y",
+              "W",
+              "K",
+              "V",
+              "X",
+              "Z",
+              "J",
+              "Q",
+            ];
+            const guessed = new Set([
+              ...(gameState.puzzle.revealedLetters || []),
+              ...(gameState.selectedLetters || []),
+            ]);
+            let chosenLetter = null;
+            for (const l of commonLetters) {
+              if (!guessed.has(l)) {
+                chosenLetter = l;
+                break;
               }
             }
+            if (chosenLetter) {
+              const response = await fetch("/api/game/letter", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  gameId,
+                  playerId: currentPlayer.id,
+                  letter: chosenLetter,
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.error) {
+                console.error("Bot letter error:", data.error);
+              } else {
+                setGameState(data.gameState);
+                if (data.message) {
+                  setMessage(
+                    `${currentPlayer.name} guesses ${chosenLetter}: ${data.message}`,
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error processing bot letter:", error);
+          } finally {
+            setBotThinking(false);
+            botActionInProgress.current = false;
           }
-        } catch (error) {
-          console.error("Error processing bot letter:", error);
-        } finally {
-          setBotThinking(false);
-          botActionInProgress.current = false;
-        }
-      }, 1500 + Math.random() * 1000);
+        },
+        1500 + Math.random() * 1000,
+      );
 
       return;
     }
@@ -271,14 +320,18 @@ export default function Home() {
       const response = await fetch("/api/game/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerName, difficulty: puzzleDifficulty }),
+        body: JSON.stringify({
+          playerName,
+          difficulty: puzzleDifficulty,
+          canSeeOthers,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Create game error:", errorData);
         setMessage(
-          `Error creating game: ${errorData.error || "Unknown error"}`
+          `Error creating game: ${errorData.error || "Unknown error"}`,
         );
         return;
       }
@@ -307,7 +360,7 @@ export default function Home() {
       const response = await fetch("/api/game/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameId, playerName }),
+        body: JSON.stringify({ gameId, playerName, canSeeOthers }),
       });
 
       if (!response.ok) {
@@ -341,7 +394,7 @@ export default function Home() {
         console.error(
           "❌ Leaderboard fetch failed:",
           response.status,
-          await response.text()
+          await response.text(),
         );
       }
     } catch (error) {
@@ -408,7 +461,7 @@ export default function Home() {
       setMessage(
         `Error adding bot: ${
           error instanceof Error ? error.message : "Network error"
-        }`
+        }`,
       );
     } finally {
       setLoading(false);
@@ -451,7 +504,7 @@ export default function Home() {
         }
         console.error("Action submission error:", errorData);
         setMessage(
-          errorData.error || `Failed to submit action (${response.status})`
+          errorData.error || `Failed to submit action (${response.status})`,
         );
         return;
       }
@@ -468,7 +521,7 @@ export default function Home() {
     } catch (error) {
       console.error("Error submitting action:", error);
       setMessage(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     } finally {
       setLoading(false);
@@ -497,7 +550,7 @@ export default function Home() {
           const errorData = await response.json();
           console.error(
             "Letter submission error data:",
-            JSON.stringify(errorData)
+            JSON.stringify(errorData),
           );
           errorMessage = errorData.error || errorMessage;
         } catch (e) {
@@ -521,7 +574,7 @@ export default function Home() {
       setMessage(
         `Error submitting letter: ${
           error instanceof Error ? error.message : "Network error"
-        }`
+        }`,
       );
     } finally {
       setLoading(false);
@@ -545,7 +598,7 @@ export default function Home() {
         // Handle validation errors (like punctuation) without clearing the guess
         if (data.error === "No punctuation allowed") {
           setMessage(
-            data.message || "Please remove punctuation from your guess"
+            data.message || "Please remove punctuation from your guess",
           );
           // Update game state if provided but don't clear the guess
           if (data.gameState) {
@@ -614,32 +667,35 @@ export default function Home() {
     const words = gameState.puzzle.phrase.split(" ");
 
     return (
-      <div className="mb-4 sm:mb-6 rounded-lg bg-[#1B2A30] p-3 sm:p-6 border-2 border-[#B06821]">
-        <div className="text-center mb-3 sm:mb-4">
-          <p className="text-[#B06821] font-bold text-base sm:text-lg">
-            {gameState.puzzle.category}
-          </p>
+      <>
+        {renderActionLog()}
+        <div className="mb-4 sm:mb-6 rounded-lg bg-[#1B2A30] p-3 sm:p-6 border-2 border-[#B06821]">
+          <div className="text-center mb-3 sm:mb-4">
+            <p className="text-[#B06821] font-bold text-base sm:text-lg">
+              {gameState.puzzle.category}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+            {words.map((word, wordIdx) => (
+              <div key={wordIdx} className="flex gap-1">
+                {word.split("").map((letter, letterIdx) => {
+                  const isRevealed = gameState.puzzle.revealedLetters.includes(
+                    letter.toUpperCase(),
+                  );
+                  return (
+                    <div
+                      key={letterIdx}
+                      className="w-8 h-12 sm:w-10 sm:h-14 md:w-12 md:h-16 border-2 border-white bg-white/10 flex items-center justify-center text-lg sm:text-2xl font-bold text-white"
+                    >
+                      {isRevealed ? letter.toUpperCase() : ""}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-          {words.map((word, wordIdx) => (
-            <div key={wordIdx} className="flex gap-1">
-              {word.split("").map((letter, letterIdx) => {
-                const isRevealed = gameState.puzzle.revealedLetters.includes(
-                  letter.toUpperCase()
-                );
-                return (
-                  <div
-                    key={letterIdx}
-                    className="w-8 h-12 sm:w-10 sm:h-14 md:w-12 md:h-16 border-2 border-white bg-white/10 flex items-center justify-center text-lg sm:text-2xl font-bold text-white"
-                  >
-                    {isRevealed ? letter.toUpperCase() : ""}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
+      </>
     );
   };
 
@@ -686,6 +742,21 @@ export default function Home() {
                   className="w-full rounded-lg bg-[#305853] p-3 text-white border border-[#B06821] focus:outline-none focus:ring-2 focus:ring-[#B06821]"
                   placeholder="Enter your name (max 20 chars)"
                 />
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  id="canSeeOthers"
+                  type="checkbox"
+                  checked={canSeeOthers}
+                  onChange={() => setCanSeeOthers((v) => !v)}
+                  className="accent-[#B06821] w-4 h-4"
+                />
+                <label
+                  htmlFor="canSeeOthers"
+                  className="text-white select-none"
+                >
+                  See other players' actions & responses
+                </label>
               </div>
 
               <div>
@@ -1060,7 +1131,7 @@ export default function Home() {
                             ? "V.Hard"
                             : diff.charAt(0).toUpperCase() + diff.slice(1)}
                         </button>
-                      )
+                      ),
                     )}
                   </div>
                 </div>
@@ -1082,10 +1153,10 @@ export default function Home() {
                             {index === 0
                               ? "🥇"
                               : index === 1
-                              ? "🥈"
-                              : index === 2
-                              ? "🥉"
-                              : `${index + 1}.`}
+                                ? "🥈"
+                                : index === 2
+                                  ? "🥉"
+                                  : `${index + 1}.`}
                           </span>
                           <div>
                             <div className="text-white font-semibold">
@@ -1239,7 +1310,7 @@ export default function Home() {
                             ? "V.Hard"
                             : diff.charAt(0).toUpperCase() + diff.slice(1)}
                         </button>
-                      )
+                      ),
                     )}
                   </div>
                 </div>
@@ -1261,10 +1332,10 @@ export default function Home() {
                             {index === 0
                               ? "🥇"
                               : index === 1
-                              ? "🥈"
-                              : index === 2
-                              ? "🥉"
-                              : `${index + 1}.`}
+                                ? "🥈"
+                                : index === 2
+                                  ? "🥉"
+                                  : `${index + 1}.`}
                           </span>
                           <div>
                             <div className="text-white font-semibold">

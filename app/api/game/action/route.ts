@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     if (!gameId || !playerId || !action) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         // All players eliminated - game over, highest score wins
         gameState.phase = "game-over";
         const winner = [...gameState.players].sort(
-          (a: any, b: any) => b.score - a.score
+          (a: any, b: any) => b.score - a.score,
         )[0];
         gameState.winner = winner.id;
         outcome += " All players have been eliminated!";
@@ -74,6 +74,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Log the action and outcome for visibility feature
+    if (!gameState.actionLog) gameState.actionLog = [];
+    gameState.actionLog.push({
+      playerId,
+      action,
+      outcome,
+      round: gameState.roundNumber,
+    });
+
     await setGame(gameId, gameState);
 
     return NextResponse.json({
@@ -84,14 +93,14 @@ export async function POST(request: NextRequest) {
     console.error("Error processing action:", error);
     return NextResponse.json(
       { error: error?.message || "Failed to process action" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 async function evaluateAction(
   action: string,
-  scenario: string
+  scenario: string,
 ): Promise<{ success: boolean; outcome: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return evaluateActionFallback(action);
@@ -149,7 +158,7 @@ OUTPUT FORMAT (MUST FOLLOW):
   }
 
   function parseLine(
-    line: string
+    line: string,
   ): { success: boolean; outcome: string } | null {
     const t = (line || "").trim();
 

@@ -5,6 +5,7 @@ export type Player = {
   lives: number;
   score: number;
   isBot: boolean;
+  canSeeOthers?: boolean; // New: whether player can see other players' actions
 };
 
 export type GamePhase =
@@ -34,6 +35,8 @@ export interface GameState {
   roundNumber: number;
   winner: string | null;
   createdAt: number;
+  // Optionally, keep a log of actions for this feature
+  actionLog?: Array<{ playerId: string; action: string; outcome: string; round: number }>;
 }
 
 export type ActionResult = {
