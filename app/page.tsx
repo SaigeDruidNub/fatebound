@@ -118,12 +118,9 @@ export default function Home() {
   const renderActionLog = () => {
     if (!gameState || !Array.isArray(gameState.actionLog)) return null;
     const me = gameState.players.find((p) => p.id === playerId);
-    // If canSeeOthers is false, only show own actions (already filtered by backend)
-    // If canSeeOthers is true, show all actions
-    if (me && me.canSeeOthers === false && gameState.actionLog.length === 0) {
-      return (
-        <div className="text-white text-sm mb-2">No actions to show yet.</div>
-      );
+    // If canSeeOthers is false, hide the action log entirely
+    if (me && me.canSeeOthers === false) {
+      return null;
     }
     return (
       <div className="bg-[#1B2A30]/60 p-4 rounded-lg mb-4 border border-[#305853]">
