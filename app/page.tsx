@@ -49,7 +49,8 @@ export default function Home() {
     useState<PuzzleDifficulty>("medium");
   const [canSeeOthers, setCanSeeOthers] = useState<boolean>(true); // New: toggle for see others
   const botActionInProgress = useRef(false);
-  const leaderboardSubmitted = useRef(false);
+  // Track last submitted gameId to prevent duplicate leaderboard submissions
+  const lastSubmittedGameId = useRef<string | null>(null);
 
   // Sync gameId from gameState if needed
   useEffect(() => {
@@ -58,14 +59,15 @@ export default function Home() {
     }
   }, [gameState, gameId]);
 
-  // Submit to leaderboard when game ends
+  // Submit to leaderboard when game ends (only once per gameId)
   useEffect(() => {
     if (
       gameState?.phase === "game-over" &&
       gameState.winner &&
-      !leaderboardSubmitted.current
+      gameState.id &&
+      lastSubmittedGameId.current !== gameState.id
     ) {
-      leaderboardSubmitted.current = true;
+      lastSubmittedGameId.current = gameState.id;
       const winner = gameState.players.find((p) => p.id === gameState.winner);
 
       if (winner && winner.score > 0) {
@@ -86,7 +88,7 @@ export default function Home() {
           });
       }
     }
-  }, [gameState?.phase, gameState?.winner, gameState]);
+  }, [gameState?.phase, gameState?.winner, gameState?.id]);
 
   // Poll for game state updates
   useEffect(() => {
