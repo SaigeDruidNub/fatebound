@@ -74,7 +74,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to start p
 - **Framework:** Next.js 16 with App Router
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS
-- **AI:** Google Gemini 2.0 Flash (optional, with fallback system)
+- **AI:** Google Gemini 3.0 Flash Preview (optional, with fallback system)
 
 ## Learn More
 
